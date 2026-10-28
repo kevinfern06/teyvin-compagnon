@@ -6,9 +6,8 @@
 //! Teyvin à jour), le démarrage avec Windows et un bouton vers Teyvin.
 
 use std::thread;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::Duration;
 
-use chrono::Local;
 use egui::{
     Align2, Button, Color32, Context, CornerRadius, FontId, Id, OpenUrl, PointerButton, Rect,
     RichText, Sense, Stroke, StrokeKind, Vec2, ViewportCommand, pos2, vec2,
@@ -199,32 +198,6 @@ struct View {
     spinner: bool,
 }
 
-fn clock(ms: u128) -> String {
-    let secs = (ms / 1000) as i64;
-    chrono::DateTime::from_timestamp(secs, 0)
-        .map(|d| d.with_timezone(&Local).format("%H h %M").to_string())
-        .unwrap_or_default()
-}
-
-fn instant_clock(t: Instant) -> String {
-    let ago = chrono::Duration::from_std(t.elapsed()).unwrap_or_default();
-    (Local::now() - ago).format("%H h %M").to_string()
-}
-
-fn ago(ms: u128) -> String {
-    let now = SystemTime::now()
-        .duration_since(UNIX_EPOCH)
-        .map(|d| d.as_millis())
-        .unwrap_or(ms);
-    let minutes = (now.saturating_sub(ms) / 60_000) as u64;
-    match minutes {
-        0 => "à l'instant".to_string(),
-        1 => "il y a 1 min".to_string(),
-        m if m < 60 => format!("il y a {m} min"),
-        m => format!("il y a {} h", m / 60),
-    }
-}
-
 fn view(state: &AppState) -> View {
     let wait = |title: &str, subtitle: &str| View {
         title: title.to_string(),
@@ -271,7 +244,7 @@ fn view(state: &AppState) -> View {
             ];
             if state.capturing {
                 steps[1] = match game {
-                    Some(t) => (Step::Done, "Jeu connecté", format!("à {}", instant_clock(t))),
+                    Some(_) => (Step::Done, "Jeu connecté", "connexion lue".into()),
                     None => (Step::Current, "Jeu connecté", "en attente…".into()),
                 };
             }
@@ -280,9 +253,11 @@ fn view(state: &AppState) -> View {
                 steps[2] = (if read { Step::Done } else { Step::Current }, "Compte lu", detail.into());
             }
             if read {
-                steps[3] = match synced.filter(|_| teyvin) {
-                    Some(s) => (Step::Done, "Teyvin à jour", format!("à {}", clock(s))),
-                    None => (Step::Current, "Teyvin à jour", "ouvre Teyvin".into()),
+                // Rappel utile plutôt qu'une heure : le compte n'est lu qu'à la connexion au jeu
+                steps[3] = if teyvin {
+                    (Step::Done, "Teyvin à jour", "après un farm : reconnecte-toi".into())
+                } else {
+                    (Step::Current, "Teyvin à jour", "ouvre Teyvin".into())
                 };
             }
 
@@ -307,7 +282,8 @@ fn view(state: &AppState) -> View {
             } else {
                 (
                     "Tout est à jour",
-                    format!("Teyvin synchronisé {}", synced.map(ago).unwrap_or_default()),
+                    "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin."
+                        .to_string(),
                     false,
                     None,
                 )
@@ -452,7 +428,7 @@ impl IrminsulApp {
                 _ => (Color32::from_rgba_unmultiplied(255, 255, 255, 10), Color32::from_rgba_unmultiplied(255, 255, 255, 22)),
             };
             painter.rect_filled(rect, CornerRadius::same(12), fill);
-            painter.rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0, border), StrokeKind::Inside);
+            painter.rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0_f32, border), StrokeKind::Inside);
 
             let dim = *step == Step::Todo;
             let center = pos2(rect.left() + 24.0, rect.top() + 24.0);
@@ -462,11 +438,11 @@ impl IrminsulApp {
                     painter.text(center, Align2::CENTER_CENTER, egui_material_icons::icons::ICON_CHECK, FontId::proportional(15.0), ON_TEAL);
                 }
                 Step::Current => {
-                    painter.circle_stroke(center, 10.0, Stroke::new(2.0, WARN));
+                    painter.circle_stroke(center, 10.0, Stroke::new(2.0_f32, WARN));
                     painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(12.0), WARN);
                 }
                 Step::Todo => {
-                    painter.circle_stroke(center, 10.0, Stroke::new(1.0, MUTED.gamma_multiply(0.6)));
+                    painter.circle_stroke(center, 10.0, Stroke::new(1.0_f32, MUTED.gamma_multiply(0.6)));
                     painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(12.0), MUTED);
                 }
             }
@@ -519,7 +495,7 @@ impl IrminsulApp {
         let outline = |text: &str| {
             Button::new(RichText::new(text).color(INK).size(14.0))
                 .fill(Color32::TRANSPARENT)
-                .stroke(Stroke::new(1.0, Color32::from_rgba_unmultiplied(255, 255, 255, 40)))
+                .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 40)))
                 .corner_radius(8)
         };
         match (&v.action, &v.secondary) {
