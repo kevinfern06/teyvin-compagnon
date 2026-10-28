@@ -15,8 +15,10 @@ Teyvin Compagnon est [Irminsul](https://github.com/konkers/irminsul) de Konkers,
 - le site Teyvin, ouvert dans ton navigateur, les y lit et se met à jour. Seul le site Teyvin a le droit de les
   lire ; rien n'est envoyé sur Internet.
 
-La modification tient en un fichier ([`teyvin/relay.rs`](teyvin/relay.rs)) et quatre lignes dans le code
-d'Irminsul, appliquées par [`teyvin/apply.py`](teyvin/apply.py).
+Le moteur d'Irminsul (lecture du jeu, mises à jour) reste intact. On y ajoute le relais
+([`teyvin/relay.rs`](teyvin/relay.rs)), on remplace son écran par celui du compagnon, aux couleurs de Teyvin
+([`teyvin/app.rs`](teyvin/app.rs) : l'état en grand, quatre étapes, « Démarrer avec Windows », « Ouvrir Teyvin »),
+et on modifie trois lignes ailleurs. Le tout est appliqué par [`teyvin/apply.py`](teyvin/apply.py).
 
 ## Installation
 
@@ -24,7 +26,7 @@ d'Irminsul, appliquées par [`teyvin/apply.py`](teyvin/apply.py).
 2. Lance-le **avant** le jeu. Il demande les droits administrateur pour lire le trafic du jeu, comme Irminsul.
    Windows peut afficher un avertissement SmartScreen (programme non signé) : « Informations complémentaires »,
    puis « Exécuter quand même ».
-3. Dans ses réglages, coche le démarrage automatique de la capture.
+3. La capture démarre toute seule. Coche « Démarrer avec Windows » pour ne plus avoir à y penser.
 4. Ouvre Teyvin : la première fois, le navigateur peut te demander l'accès au réseau local. Accepte.
 
 Le compagnon se met à jour tout seul, comme Irminsul.

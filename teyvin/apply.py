@@ -2,9 +2,10 @@
 
 Usage : python teyvin/apply.py <dossier irminsul> --version 0.2.2-teyvin.1 --repo propriétaire/teyvin-compagnon
 
-La modification reste minuscule pour survivre aux mises à jour d'Irminsul : un fichier ajouté
-(src/relay.rs) et quatre lignes. Chaque point d'ancrage doit apparaître exactement une fois ; sinon le
-script s'arrête avec un message clair (le code d'Irminsul a changé : à corriger à la main).
+Le moteur d'Irminsul (lecture du jeu, mises à jour) reste intact. On ajoute le relais (src/relay.rs), on
+remplace l'écran (src/app.rs, aux couleurs de Teyvin) et on modifie trois lignes ailleurs. Chaque point
+d'ancrage doit apparaître exactement une fois ; sinon le script s'arrête avec un message clair (le code
+d'Irminsul a changé : à corriger à la main).
 """
 
 import argparse
@@ -47,15 +48,15 @@ def main() -> None:
     print("Teyvin Compagnon : application de la modification")
     shutil.copy(HERE / "relay.rs", src / "relay.rs")
     print("  ajouté : relay.rs")
+    # Écran du compagnon, aux couleurs de Teyvin (il lance aussi le relais avec le lien des vœux)
+    shutil.copy(HERE / "app.rs", src / "app.rs")
+    shutil.copy(HERE / "nuit.webp", args.irminsul / "assets" / "teyvin-nuit.webp")
+    print("  remplacé : app.rs (écran Teyvin)")
 
     # 1. Déclarer le module
     edit(src / "main.rs", "mod player_data;\n", f"mod player_data;\nmod relay; {MARK}\n")
 
-    # 2. Lancer le relais, avec le lien de l'historique de vœux qu'Irminsul trouve déjà
-    anchor = "    let (wish_url_tx, wish_url_rx) = watch::channel(None);\n"
-    edit(src / "app.rs", anchor, anchor + f"    crate::relay::start(wish_url_rx.clone()); {MARK}\n")
-
-    # 3. Publier un export GOOD à chaque nouvelle donnée du jeu
+    # 2. Publier un export GOOD à chaque nouvelle donnée du jeu
     anchor = "        if has_new_data {\n"
     edit(
         src / "monitor.rs",
@@ -65,11 +66,11 @@ def main() -> None:
         + f"&crate::relay::export_settings())); {MARK}\n",
     )
 
-    # 4. Mises à jour automatiques depuis les releases du compagnon (et non celles d'Irminsul)
+    # 3. Mises à jour automatiques depuis les releases du compagnon (et non celles d'Irminsul)
     edit(src / "update.rs", '.repo_owner("konkers")', f'.repo_owner("{owner}")')
     edit(src / "update.rs", '.repo_name("irminsul")', f'.repo_name("{name}")')
 
-    # 5. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour
+    # 4. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour
     cargo = args.irminsul / "Cargo.toml"
     text = cargo.read_bytes().decode("utf-8")
     text, n = re.subn(r'(?m)^version = "[^"]+"', f'version = "{args.version}"', text, count=1)

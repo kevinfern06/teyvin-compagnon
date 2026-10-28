@@ -30,6 +30,8 @@ struct Snapshot {
 }
 
 static LATEST: Mutex<Option<Snapshot>> = Mutex::new(None);
+/// Dernière fois que le site Teyvin a lu l'export (millisecondes depuis l'époque Unix).
+static SYNCED_AT: Mutex<Option<u128>> = Mutex::new(None);
 static WISH: OnceLock<watch::Receiver<Option<String>>> = OnceLock::new();
 
 /// Réglages d'export par défaut d'Irminsul, repris tels quels (ils suivent ses mises à jour).
@@ -40,14 +42,33 @@ pub fn export_settings() -> crate::player_data::ExportSettings {
         .expect("export_settings fait partie de SavedAppState")
 }
 
+fn now_ms() -> u128 {
+    SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .map(|d| d.as_millis())
+        .unwrap_or(0)
+}
+
+/// Heure du dernier export (compte lu), pour l'écran du compagnon.
+pub fn exported_at() -> Option<u128> {
+    LATEST.lock().ok().and_then(|l| l.as_ref().map(|s| s.updated_at))
+}
+
+/// Heure de la dernière lecture par Teyvin.
+pub fn synced_at() -> Option<u128> {
+    SYNCED_AT.lock().ok().and_then(|s| *s)
+}
+
+/// Lien de l'historique de vœux trouvé ?
+pub fn has_wish_url() -> bool {
+    wish_url().is_some()
+}
+
 /// Enregistre le dernier export GOOD (appelé à chaque nouvelle donnée du jeu).
 pub fn publish(good: anyhow::Result<String>) {
     match good {
         Ok(good) => {
-            let updated_at = SystemTime::now()
-                .duration_since(UNIX_EPOCH)
-                .map(|d| d.as_millis())
-                .unwrap_or(0);
+            let updated_at = now_ms();
             if let Ok(mut latest) = LATEST.lock() {
                 *latest = Some(Snapshot { good, updated_at });
             }
@@ -138,6 +159,14 @@ fn handle(mut stream: TcpStream) -> anyhow::Result<()> {
     let path = req.path.split('?').next().unwrap_or_default();
     match path {
         "/status" => {
+            // Teyvin passe ici chaque minute : s'il a déjà l'export le plus récent, il est à jour
+            if allowed.is_some() {
+                if let (Ok(mut s), Some(exp)) = (SYNCED_AT.lock(), exported_at()) {
+                    if s.is_some_and(|t| t >= exp) {
+                        *s = Some(now_ms());
+                    }
+                }
+            }
             let (good, wish) = (
                 LATEST.lock().ok().and_then(|l| l.as_ref().map(|s| s.updated_at)),
                 wish_url().is_some(),
@@ -153,7 +182,14 @@ fn handle(mut stream: TcpStream) -> anyhow::Result<()> {
         "/good" => {
             let good = LATEST.lock().ok().and_then(|l| l.as_ref().map(|s| s.good.clone()));
             match good {
-                Some(good) => respond(&mut stream, 200, allowed, "application/json", &good),
+                Some(good) => {
+                    if allowed.is_some() {
+                        if let Ok(mut s) = SYNCED_AT.lock() {
+                            *s = Some(now_ms());
+                        }
+                    }
+                    respond(&mut stream, 200, allowed, "application/json", &good)
+                }
                 None => respond(&mut stream, 404, allowed, "text/plain", "Pas encore de données"),
             }
         }
