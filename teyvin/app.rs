@@ -3,8 +3,10 @@
 //! Remplace l'écran d'Irminsul (src/app.rs) en gardant son moteur : même démarrage (vérification des mises à
 //! jour, lecture du lien de vœux, capture), mêmes messages vers le moniteur. L'écran ne montre que ce qui
 //! sert : une bannière de nuit avec l'état général, quatre étapes (compagnon prêt, jeu connecté, compte lu,
-//! Teyvin à jour), le démarrage avec Windows et un bouton vers Teyvin.
+//! Teyvin à jour), le démarrage avec Windows et un bouton vers Teyvin. En français si Windows l'est, en
+//! anglais sinon.
 
+use std::sync::OnceLock;
 use std::thread;
 use std::time::Duration;
 
@@ -20,7 +22,166 @@ use crate::player_data::ExportSettings;
 use crate::update::check_for_app_update;
 use crate::{AppState, Message, ReloadHandle, State, TracingLevel, capture, open_log_dir, wish};
 
-const TEYVIN_URL: &str = "https://teyvin.vercel.app/compte";
+/// Textes de l'écran, en français et en anglais (termes officiels du jeu en anglais).
+/// `{v}` est remplacé par la version.
+struct Texts {
+    url: &'static str,
+    brand: &'static str,
+    step_ready: &'static str,
+    step_game: &'static str,
+    step_read: &'static str,
+    step_teyvin: &'static str,
+    starting_detail: &'static str,
+    starting: &'static str,
+    checking_updates: &'static str,
+    loading_data: &'static str,
+    update: &'static str,
+    later: &'static str,
+    update_available: &'static str,
+    update_ready: &'static str,
+    updating: &'static str,
+    will_restart: &'static str,
+    updated: &'static str,
+    restarting: &'static str,
+    capture_on: &'static str,
+    capture_off: &'static str,
+    waiting: &'static str,
+    open_teyvin_detail: &'static str,
+    login_read: &'static str,
+    with_wishes: &'static str,
+    chars_inventory: &'static str,
+    after_farm: &'static str,
+    capture_stopped: &'static str,
+    capture_stopped_hint: &'static str,
+    start_capture: &'static str,
+    waiting_game: &'static str,
+    waiting_game_hint: &'static str,
+    reading: &'static str,
+    reading_hint: &'static str,
+    read_hint: &'static str,
+    all_done: &'static str,
+    all_done_hint: &'static str,
+    autostart: &'static str,
+    open_teyvin: &'static str,
+    minimize: &'static str,
+    logs: &'static str,
+    credit: &'static str,
+}
+
+const FR: Texts = Texts {
+    url: "https://teyvin.vercel.app/compte",
+    brand: "TEYVIN COMPAGNON",
+    step_ready: "Compagnon prêt",
+    step_game: "Jeu connecté",
+    step_read: "Compte lu",
+    step_teyvin: "Teyvin à jour",
+    starting_detail: "démarrage…",
+    starting: "Démarrage…",
+    checking_updates: "Vérification des mises à jour du compagnon.",
+    loading_data: "Chargement des données du jeu.",
+    update: "Mettre à jour",
+    later: "Plus tard",
+    update_available: "Mise à jour disponible",
+    update_ready: "La version {v} du compagnon est prête.",
+    updating: "Mise à jour en cours…",
+    will_restart: "Le compagnon redémarrera tout seul.",
+    updated: "Mis à jour",
+    restarting: "Redémarrage du compagnon…",
+    capture_on: "capture active",
+    capture_off: "capture arrêtée",
+    waiting: "en attente…",
+    open_teyvin_detail: "ouvre Teyvin",
+    login_read: "connexion lue",
+    with_wishes: "vœux compris",
+    chars_inventory: "persos et inventaire",
+    after_farm: "après un farm : reconnecte-toi",
+    capture_stopped: "Capture arrêtée",
+    capture_stopped_hint: "Relance la capture pour que le compagnon lise ton compte.",
+    start_capture: "Démarrer la capture",
+    waiting_game: "En attente du jeu",
+    waiting_game_hint: "Lance Genshin et connecte-toi. Déjà en jeu ? Reviens à l'écran de connexion.",
+    reading: "Lecture du compte…",
+    reading_hint: "Encore un instant.",
+    read_hint: "Ouvre Teyvin pour le mettre à jour.",
+    all_done: "Tout est à jour",
+    all_done_hint: "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin.",
+    autostart: "Démarrer avec Windows",
+    open_teyvin: "Ouvrir Teyvin",
+    minimize: "Réduire",
+    logs: "Journaux",
+    credit: "v{v} · basé sur Irminsul de Konkers",
+};
+
+const EN: Texts = Texts {
+    url: "https://teyvin.vercel.app/en/account",
+    brand: "TEYVIN COMPANION",
+    step_ready: "Companion ready",
+    step_game: "Game connected",
+    step_read: "Account read",
+    step_teyvin: "Teyvin up to date",
+    starting_detail: "starting…",
+    starting: "Starting…",
+    checking_updates: "Checking for companion updates.",
+    loading_data: "Loading game data.",
+    update: "Update",
+    later: "Later",
+    update_available: "Update available",
+    update_ready: "Companion version {v} is ready.",
+    updating: "Updating…",
+    will_restart: "The companion will restart on its own.",
+    updated: "Updated",
+    restarting: "Restarting the companion…",
+    capture_on: "capture on",
+    capture_off: "capture stopped",
+    waiting: "waiting…",
+    open_teyvin_detail: "open Teyvin",
+    login_read: "login read",
+    with_wishes: "wishes included",
+    chars_inventory: "characters and inventory",
+    after_farm: "after farming: log in again",
+    capture_stopped: "Capture stopped",
+    capture_stopped_hint: "Start the capture again so the companion can read your account.",
+    start_capture: "Start capture",
+    waiting_game: "Waiting for the game",
+    waiting_game_hint: "Launch Genshin and log in. Already in game? Go back to the login screen.",
+    reading: "Reading account…",
+    reading_hint: "Just a moment.",
+    read_hint: "Open Teyvin to update it.",
+    all_done: "All up to date",
+    all_done_hint: "Your account is read when you log in: after farming, log in again to refresh Teyvin.",
+    autostart: "Start with Windows",
+    open_teyvin: "Open Teyvin",
+    minimize: "Minimize",
+    logs: "Logs",
+    credit: "v{v} · based on Irminsul by Konkers",
+};
+
+/// Textes dans la langue de Windows : français si elle l'est, anglais sinon.
+/// La variable d'environnement `TEYVIN_LANG` (fr, en) force la langue, pour vérifier les deux.
+fn tx() -> &'static Texts {
+    static FRENCH: OnceLock<bool> = OnceLock::new();
+    let french = *FRENCH.get_or_init(|| match std::env::var("TEYVIN_LANG") {
+        Ok(lang) => lang.to_ascii_lowercase().starts_with("fr"),
+        Err(_) => windows_is_french(),
+    });
+    if french { &FR } else { &EN }
+}
+
+/// Langue de l'interface de Windows (pas celle des formats de date) : sa langue principale, LANG_FRENCH = 0x0C.
+#[cfg(windows)]
+fn windows_is_french() -> bool {
+    #[link(name = "kernel32")]
+    unsafe extern "system" {
+        fn GetUserDefaultUILanguage() -> u16;
+    }
+    // SAFETY : fonction Windows sans argument, toujours disponible
+    (unsafe { GetUserDefaultUILanguage() } & 0x3FF) == 0x0C
+}
+
+#[cfg(not(windows))]
+fn windows_is_french() -> bool {
+    std::env::var("LANG").is_ok_and(|lang| lang.starts_with("fr"))
+}
 
 // Couleurs de Teyvin (DA « Irminsul nuit »)
 const BG: Color32 = Color32::from_rgb(6, 9, 11);
@@ -199,15 +360,16 @@ struct View {
 }
 
 fn view(state: &AppState) -> View {
+    let t = tx();
     let wait = |title: &str, subtitle: &str| View {
         title: title.to_string(),
         subtitle: subtitle.to_string(),
         warn: false,
         steps: [
-            (Step::Current, "Compagnon prêt", "démarrage…".into()),
-            (Step::Todo, "Jeu connecté", "—".into()),
-            (Step::Todo, "Compte lu", "—".into()),
-            (Step::Todo, "Teyvin à jour", "—".into()),
+            (Step::Current, t.step_ready, t.starting_detail.into()),
+            (Step::Todo, t.step_game, "—".into()),
+            (Step::Todo, t.step_read, "—".into()),
+            (Step::Todo, t.step_teyvin, "—".into()),
         ],
         action: None,
         secondary: None,
@@ -216,17 +378,17 @@ fn view(state: &AppState) -> View {
 
     match &state.state {
         State::Starting | State::CheckingForUpdate | State::CheckingForData | State::Downloading => {
-            wait("Démarrage…", "Vérification des mises à jour du compagnon.")
+            wait(t.starting, t.checking_updates)
         }
-        State::WaitingForDownloadConfirmation(_) => wait("Démarrage…", "Chargement des données du jeu."),
+        State::WaitingForDownloadConfirmation(_) => wait(t.starting, t.loading_data),
         State::WaitingForUpdateConfirmation(version) => View {
             spinner: false,
-            action: Some(("Mettre à jour", Message::UpdateAcknowledged)),
-            secondary: Some(("Plus tard", Message::UpdateCanceled)),
-            ..wait("Mise à jour disponible", &format!("La version {version} du compagnon est prête."))
+            action: Some((t.update, Message::UpdateAcknowledged)),
+            secondary: Some((t.later, Message::UpdateCanceled)),
+            ..wait(t.update_available, &t.update_ready.replace("{v}", &version.to_string()))
         },
-        State::Updating => wait("Mise à jour en cours…", "Le compagnon redémarrera tout seul."),
-        State::Updated { .. } => wait("Mis à jour", "Redémarrage du compagnon…"),
+        State::Updating => wait(t.updating, t.will_restart),
+        State::Updated { .. } => wait(t.updated, t.restarting),
         State::Main => {
             let u = &state.updated;
             let game = u.items_updated.or(u.characters_updated);
@@ -237,60 +399,44 @@ fn view(state: &AppState) -> View {
 
             let capture = if state.capturing { Step::Done } else { Step::Current };
             let mut steps = [
-                (capture, "Compagnon prêt", if state.capturing { "capture active".into() } else { "capture arrêtée".into() }),
-                (Step::Todo, "Jeu connecté", "en attente…".into()),
-                (Step::Todo, "Compte lu", "—".into()),
-                (Step::Todo, "Teyvin à jour", "ouvre Teyvin".into()),
+                (capture, t.step_ready, if state.capturing { t.capture_on.into() } else { t.capture_off.into() }),
+                (Step::Todo, t.step_game, t.waiting.into()),
+                (Step::Todo, t.step_read, "—".into()),
+                (Step::Todo, t.step_teyvin, t.open_teyvin_detail.into()),
             ];
             if state.capturing {
                 steps[1] = match game {
-                    Some(_) => (Step::Done, "Jeu connecté", "connexion lue".into()),
-                    None => (Step::Current, "Jeu connecté", "en attente…".into()),
+                    Some(_) => (Step::Done, t.step_game, t.login_read.into()),
+                    None => (Step::Current, t.step_game, t.waiting.into()),
                 };
             }
             if game.is_some() {
-                let detail = if crate::relay::has_wish_url() { "vœux compris" } else { "persos et inventaire" };
-                steps[2] = (if read { Step::Done } else { Step::Current }, "Compte lu", detail.into());
+                let detail = if crate::relay::has_wish_url() { t.with_wishes } else { t.chars_inventory };
+                steps[2] = (if read { Step::Done } else { Step::Current }, t.step_read, detail.into());
             }
             if read {
                 // Rappel utile plutôt qu'une heure : le compte n'est lu qu'à la connexion au jeu
                 steps[3] = if teyvin {
-                    (Step::Done, "Teyvin à jour", "après un farm : reconnecte-toi".into())
+                    (Step::Done, t.step_teyvin, t.after_farm.into())
                 } else {
-                    (Step::Current, "Teyvin à jour", "ouvre Teyvin".into())
+                    (Step::Current, t.step_teyvin, t.open_teyvin_detail.into())
                 };
             }
 
             let (title, subtitle, warn, action) = if !state.capturing {
-                (
-                    "Capture arrêtée",
-                    "Relance la capture pour que le compagnon lise ton compte.".to_string(),
-                    true,
-                    Some(("Démarrer la capture", Message::StartCapture)),
-                )
+                (t.capture_stopped, t.capture_stopped_hint, true, Some((t.start_capture, Message::StartCapture)))
             } else if game.is_none() {
-                (
-                    "En attente du jeu",
-                    "Lance Genshin et connecte-toi. Déjà en jeu ? Reviens à l'écran de connexion.".to_string(),
-                    true,
-                    None,
-                )
+                (t.waiting_game, t.waiting_game_hint, true, None)
             } else if !read {
-                ("Lecture du compte…", "Encore un instant.".to_string(), false, None)
+                (t.reading, t.reading_hint, false, None)
             } else if !teyvin {
-                ("Compte lu", "Ouvre Teyvin pour le mettre à jour.".to_string(), true, None)
+                (t.step_read, t.read_hint, true, None)
             } else {
-                (
-                    "Tout est à jour",
-                    "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin."
-                        .to_string(),
-                    false,
-                    None,
-                )
+                (t.all_done, t.all_done_hint, false, None)
             };
             View {
                 title: title.to_string(),
-                subtitle,
+                subtitle: subtitle.to_string(),
                 warn,
                 steps,
                 action,
@@ -368,12 +514,12 @@ impl IrminsulApp {
         painter.text(
             pos2(x, y - 62.0),
             Align2::LEFT_BOTTOM,
-            "TEYVIN COMPAGNON",
+            tx().brand,
             FontId::proportional(11.0),
             TEAL_LIGHT,
         );
         let title = painter.text(pos2(x, y - 26.0), Align2::LEFT_BOTTOM, &v.title, FontId::proportional(30.0), INK);
-        if v.title == "Tout est à jour" {
+        if v.title == tx().all_done {
             painter.text(
                 pos2(title.right() + 10.0, title.center().y),
                 Align2::LEFT_CENTER,
@@ -465,13 +611,14 @@ impl IrminsulApp {
 
     /// Démarrer avec Windows, action du moment, ouvrir Teyvin ; version et journaux tout en bas.
     fn footer(&mut self, ui: &mut egui::Ui, full: Rect, v: &View) {
-        let y = full.top() + BANNER_HEIGHT + 4.0 + 92.0 + 22.0;
+        let t = tx();
+        let y =full.top() + BANNER_HEIGHT + 4.0 + 92.0 + 22.0;
         let h = 34.0;
 
         let mut autostart = self.autostart;
         let toggle = Rect::from_min_size(pos2(full.left() + MARGIN, y), vec2(240.0, h));
         if ui
-            .put(toggle, egui::Checkbox::new(&mut autostart, RichText::new("Démarrer avec Windows").color(INK).size(14.0)))
+            .put(toggle, egui::Checkbox::new(&mut autostart, RichText::new(t.autostart).color(INK).size(14.0)))
             .changed()
         {
             match autostart::set(autostart) {
@@ -481,12 +628,12 @@ impl IrminsulApp {
         }
 
         let open = Rect::from_min_size(pos2(full.right() - MARGIN - 170.0, y), vec2(170.0, h));
-        let open_label = format!("Ouvrir Teyvin  {}", egui_material_icons::icons::ICON_OPEN_IN_NEW);
+        let open_label = format!("{}  {}", t.open_teyvin, egui_material_icons::icons::ICON_OPEN_IN_NEW);
         let open_button = Button::new(RichText::new(open_label).color(ON_TEAL).strong().size(14.0))
             .fill(TEAL)
             .corner_radius(8);
         if ui.put(open, open_button).clicked() {
-            ui.ctx().open_url(OpenUrl::new_tab(TEYVIN_URL));
+            ui.ctx().open_url(OpenUrl::new_tab(t.url));
         }
 
         // Action du moment (mettre à jour, démarrer la capture), sinon « Réduire »
@@ -512,7 +659,7 @@ impl IrminsulApp {
                 }
             }
             (None, _) => {
-                if ui.put(second, outline("Réduire")).clicked() {
+                if ui.put(second, outline(t.minimize)).clicked() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
                 }
             }
@@ -524,13 +671,13 @@ impl IrminsulApp {
         painter.text(
             pos2(full.left() + MARGIN, bottom),
             Align2::LEFT_BOTTOM,
-            format!("v{} · basé sur Irminsul de Konkers", env!("CARGO_PKG_VERSION")),
+            t.credit.replace("{v}", env!("CARGO_PKG_VERSION")),
             FontId::proportional(11.0),
             MUTED.gamma_multiply(0.8),
         );
         let logs = Rect::from_min_size(pos2(full.right() - MARGIN - 70.0, bottom - 16.0), vec2(70.0, 18.0));
         if ui
-            .put(logs, Button::new(RichText::new("Journaux").size(11.0).color(MUTED)).frame(false))
+            .put(logs, Button::new(RichText::new(t.logs).size(11.0).color(MUTED)).frame(false))
             .clicked()
         {
             if let Err(e) = open_log_dir() {
