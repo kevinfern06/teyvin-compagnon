@@ -123,14 +123,12 @@ jobs:
           sha=$(git -C irminsul rev-parse HEAD)
           draft_flag=""
           if [ "$DRAFT" = "true" ]; then draft_flag="--draft"; fi
+          # Description : teyvin/RELEASE_NOTES.md, avec la version et le commit d'Irminsul
+          sed -e "s/__UPSTREAM__/$UPSTREAM/g" -e "s/__SHA__/$sha/g" compagnon/teyvin/RELEASE_NOTES.md > notes.md
           gh release create "v$VERSION" teyvin-compagnon-windows-x64.exe $draft_flag \
             -R "$GITHUB_REPOSITORY" \
             --title "Teyvin Compagnon $VERSION" \
-            --notes "Irminsul v$UPSTREAM avec le relais local de Teyvin.
-
-          Télécharge **teyvin-compagnon-windows-x64.exe**, lance-le avant le jeu (il demande les droits administrateur, comme Irminsul), et laisse Teyvin ouvert : ton compte se met à jour tout seul.
-
-          Basé sur [Irminsul](https://github.com/konkers/irminsul) de Konkers (licence MIT), commit $sha. Rien n'est envoyé ailleurs que sur ton ordinateur : le relais n'écoute que sur 127.0.0.1."
+            --notes-file notes.md
           if [ "$DRAFT" = "true" ]; then
             gh issue create -R "$GITHUB_REPOSITORY" \
               --title "Irminsul $UPSTREAM : brouillon v$VERSION à vérifier" \
