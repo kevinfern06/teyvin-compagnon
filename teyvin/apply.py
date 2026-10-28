@@ -52,6 +52,10 @@ def main() -> None:
     shutil.copy(HERE / "app.rs", src / "app.rs")
     shutil.copy(HERE / "nuit.webp", args.irminsul / "assets" / "teyvin-nuit.webp")
     print("  remplacé : app.rs (écran Teyvin)")
+    # Logo de Teyvin : icône du .exe (build.rs) et de la fenêtre (main.rs), aux mêmes chemins qu'Irminsul
+    shutil.copy(HERE / "icon.ico", args.irminsul / "assets" / "icon.ico")
+    shutil.copy(HERE / "icon-256.png", args.irminsul / "assets" / "icon-256.png")
+    print("  remplacé : icônes (logo Teyvin)")
 
     # 1. Déclarer le module
     edit(src / "main.rs", "mod player_data;\n", f"mod player_data;\nmod relay; {MARK}\n")
