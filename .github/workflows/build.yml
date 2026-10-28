@@ -2,6 +2,9 @@
 # changé), on reprend son code, on applique la modification Teyvin, on compile le .exe Windows et on
 # publie une release « vX.Y.Z-teyvin.N ». Le compagnon installé se met alors à jour tout seul.
 # Si la modification ne s'applique plus (Irminsul a changé), le job échoue : à corriger dans teyvin/.
+# Sécurité : une NOUVELLE version d'Irminsul n'est jamais publiée directement (le compagnon se met à jour
+# tout seul et tourne en administrateur). Elle part en brouillon, avec une issue pour prévenir : on relit
+# les changements d'Irminsul, puis on publie le brouillon à la main. Nos propres changements sont publiés.
 name: Compiler le compagnon
 
 on:
@@ -19,6 +22,7 @@ on:
 
 permissions:
   contents: write
+  issues: write
 
 concurrency:
   group: build
@@ -31,6 +35,8 @@ jobs:
       build: ${{ steps.plan.outputs.build }}
       upstream: ${{ steps.plan.outputs.upstream }}
       version: ${{ steps.plan.outputs.version }}
+      draft: ${{ steps.plan.outputs.draft }}
+      previous: ${{ steps.plan.outputs.previous }}
     steps:
       - id: plan
         env:
@@ -50,11 +56,18 @@ jobs:
           if [ -n "$last" ] && [ "$EVENT" = "schedule" ]; then build=false; fi
           if [ -n "$last" ] && [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" != "true" ]; then build=false; fi
           version="${upstream}-teyvin.$(( ${last:-0} + 1 ))"
-          echo "Irminsul $upstream · dernière release teyvin.${last:-aucune} · compiler : $build ($version)"
+          # Version d'Irminsul de notre dernière release publiée (hors brouillons)
+          previous=$(gh release list -R "$GITHUB_REPOSITORY" --limit 200 --exclude-drafts --json tagName -q '.[].tagName' \
+            | sed -nE 's/^v([0-9]+\.[0-9]+\.[0-9]+)-teyvin\.[0-9]+$/\1/p' | sort -V | tail -1 || true)
+          draft=false
+          if [ -n "$previous" ] && [ "$previous" != "$upstream" ]; then draft=true; fi
+          echo "Irminsul $upstream (publiée : ${previous:-aucune}) · teyvin.${last:-aucune} · compiler : $build ($version) · brouillon : $draft"
           {
             echo "build=$build"
             echo "upstream=$upstream"
             echo "version=$version"
+            echo "draft=$draft"
+            echo "previous=$previous"
           } >> "$GITHUB_OUTPUT"
 
   build:
@@ -67,6 +80,8 @@ jobs:
     env:
       VERSION: ${{ needs.check.outputs.version }}
       UPSTREAM: ${{ needs.check.outputs.upstream }}
+      DRAFT: ${{ needs.check.outputs.draft }}
+      PREVIOUS: ${{ needs.check.outputs.previous }}
     steps:
       - uses: actions/checkout@v5
         with:
@@ -96,11 +111,22 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           cp irminsul/target/release/irminsul.exe teyvin-compagnon-windows-x64.exe
-          gh release create "v$VERSION" teyvin-compagnon-windows-x64.exe \
+          sha=$(git -C irminsul rev-parse HEAD)
+          draft_flag=""
+          if [ "$DRAFT" = "true" ]; then draft_flag="--draft"; fi
+          gh release create "v$VERSION" teyvin-compagnon-windows-x64.exe $draft_flag \
             -R "$GITHUB_REPOSITORY" \
             --title "Teyvin Compagnon $VERSION" \
             --notes "Irminsul v$UPSTREAM avec le relais local de Teyvin.
 
           Télécharge **teyvin-compagnon-windows-x64.exe**, lance-le avant le jeu (il demande les droits administrateur, comme Irminsul), et laisse Teyvin ouvert : ton compte se met à jour tout seul.
 
-          Basé sur [Irminsul](https://github.com/konkers/irminsul) de Konkers (licence MIT). Rien n'est envoyé ailleurs que sur ton ordinateur : le relais n'écoute que sur 127.0.0.1."
+          Basé sur [Irminsul](https://github.com/konkers/irminsul) de Konkers (licence MIT), commit $sha. Rien n'est envoyé ailleurs que sur ton ordinateur : le relais n'écoute que sur 127.0.0.1."
+          if [ "$DRAFT" = "true" ]; then
+            gh issue create -R "$GITHUB_REPOSITORY" \
+              --title "Irminsul $UPSTREAM : brouillon v$VERSION à vérifier" \
+              --body "Irminsul est passé de v$PREVIOUS à v$UPSTREAM. Le compagnon est compilé mais pas encore publié.
+
+          1. Relire les changements : https://github.com/konkers/irminsul/compare/v$PREVIOUS...v$UPSTREAM
+          2. Si tout va bien, publier le brouillon v$VERSION dans les releases : le compagnon se mettra à jour."
+          fi

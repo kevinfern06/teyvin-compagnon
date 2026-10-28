@@ -35,7 +35,9 @@ Le compagnon se met à jour tout seul, comme Irminsul.
 
 Chaque jour, une [GitHub Action](.github/workflows/build.yml) regarde si Irminsul a publié une nouvelle version.
 Si oui, elle reprend son code, applique la modification Teyvin, compile le `.exe` et publie une release
-`vX.Y.Z-teyvin.N`. Si la modification ne s'applique plus (Irminsul a changé aux endroits touchés), l'Action
+`vX.Y.Z-teyvin.N`. Par sécurité, une **nouvelle version d'Irminsul part en brouillon** (avec une issue qui
+prévient) : on relit ses changements avant de publier, puisque le compagnon se met à jour tout seul et tourne
+en administrateur. Si la modification ne s'applique plus (Irminsul a changé aux endroits touchés), l'Action
 échoue et il faut ajuster `teyvin/apply.py`.
 
 ## Crédits et licence
