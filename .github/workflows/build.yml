@@ -1,0 +1,106 @@
+# Suit Irminsul : chaque jour, si une nouvelle version d'Irminsul est sortie (ou si notre modification a
+# changé), on reprend son code, on applique la modification Teyvin, on compile le .exe Windows et on
+# publie une release « vX.Y.Z-teyvin.N ». Le compagnon installé se met alors à jour tout seul.
+# Si la modification ne s'applique plus (Irminsul a changé), le job échoue : à corriger dans teyvin/.
+name: Compiler le compagnon
+
+on:
+  schedule:
+    - cron: "17 6 * * *" # tous les jours vers 7 h (heure de Paris)
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Recompiler même si cette version d'Irminsul est déjà publiée"
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths: ["teyvin/**", ".github/workflows/**"]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build
+  cancel-in-progress: false
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    outputs:
+      build: ${{ steps.plan.outputs.build }}
+      upstream: ${{ steps.plan.outputs.upstream }}
+      version: ${{ steps.plan.outputs.version }}
+    steps:
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          # Dernière version publiée d'Irminsul (tags vX.Y.Z)
+          upstream=$(git ls-remote --tags --refs https://github.com/konkers/irminsul 'v*' \
+            | sed 's#.*refs/tags/v##' | grep -E '^[0-9]+\.[0-9]+\.[0-9]+$' | sort -V | tail -1)
+          # Nos releases déjà publiées pour cette version
+          last=$(gh release list -R "$GITHUB_REPOSITORY" --limit 200 --json tagName -q '.[].tagName' \
+            | grep -E "^v${upstream//./\\.}-teyvin\.[0-9]+$" | sed 's/.*teyvin\.//' | sort -n | tail -1 || true)
+          build=true
+          # Tâche quotidienne : rien à faire si cette version d'Irminsul est déjà compilée
+          if [ -n "$last" ] && [ "$EVENT" = "schedule" ]; then build=false; fi
+          if [ -n "$last" ] && [ "$EVENT" = "workflow_dispatch" ] && [ "$FORCE" != "true" ]; then build=false; fi
+          version="${upstream}-teyvin.$(( ${last:-0} + 1 ))"
+          echo "Irminsul $upstream · dernière release teyvin.${last:-aucune} · compiler : $build ($version)"
+          {
+            echo "build=$build"
+            echo "upstream=$upstream"
+            echo "version=$version"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: check
+    if: needs.check.outputs.build == 'true'
+    runs-on: windows-latest
+    defaults:
+      run:
+        shell: bash
+    env:
+      VERSION: ${{ needs.check.outputs.version }}
+      UPSTREAM: ${{ needs.check.outputs.upstream }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          path: compagnon
+
+      - name: Code d'Irminsul v${{ needs.check.outputs.upstream }}
+        run: git clone --depth 1 --branch "v$UPSTREAM" https://github.com/konkers/irminsul irminsul
+
+      - name: Modification Teyvin
+        run: python compagnon/teyvin/apply.py irminsul --version "$VERSION" --repo "$GITHUB_REPOSITORY"
+
+      - uses: actions/cache@v5
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            irminsul/target
+          key: windows-cargo-${{ hashFiles('irminsul/Cargo.lock') }}
+          restore-keys: windows-cargo-
+
+      - name: Compilation
+        working-directory: irminsul
+        run: cargo build --release
+
+      - name: Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp irminsul/target/release/irminsul.exe teyvin-compagnon-windows-x64.exe
+          gh release create "v$VERSION" teyvin-compagnon-windows-x64.exe \
+            -R "$GITHUB_REPOSITORY" \
+            --title "Teyvin Compagnon $VERSION" \
+            --notes "Irminsul v$UPSTREAM avec le relais local de Teyvin.
+
+          Télécharge **teyvin-compagnon-windows-x64.exe**, lance-le avant le jeu (il demande les droits administrateur, comme Irminsul), et laisse Teyvin ouvert : ton compte se met à jour tout seul.
+
+          Basé sur [Irminsul](https://github.com/konkers/irminsul) de Konkers (licence MIT). Rien n'est envoyé ailleurs que sur ton ordinateur : le relais n'écoute que sur 127.0.0.1."

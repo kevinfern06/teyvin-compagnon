@@ -1,0 +1,44 @@
+# Teyvin Compagnon
+
+Le compagnon Windows de [Teyvin](https://teyvin.vercel.app) : lance-le avant Genshin Impact, et ton compte
+Teyvin (persos, armes, artefacts, inventaire, historique de vœux) se met à jour tout seul. Plus de fichier à
+exporter ni de lien à copier-coller.
+
+## Comment ça marche
+
+Teyvin Compagnon est [Irminsul](https://github.com/konkers/irminsul) de Konkers, sans changement, avec un petit
+**relais local** en plus :
+
+- Irminsul lit ton compte quand tu te connectes au jeu, comme d'habitude ;
+- le relais garde le dernier export (format GOOD) et le lien de ton historique de vœux en mémoire, et les sert
+  **uniquement sur ton ordinateur** (`127.0.0.1:47317`) ;
+- le site Teyvin, ouvert dans ton navigateur, les y lit et se met à jour. Seul le site Teyvin a le droit de les
+  lire ; rien n'est envoyé sur Internet.
+
+La modification tient en un fichier ([`teyvin/relay.rs`](teyvin/relay.rs)) et quatre lignes dans le code
+d'Irminsul, appliquées par [`teyvin/apply.py`](teyvin/apply.py).
+
+## Installation
+
+1. Télécharge `teyvin-compagnon-windows-x64.exe` dans les [releases](../../releases/latest).
+2. Lance-le **avant** le jeu. Il demande les droits administrateur pour lire le trafic du jeu, comme Irminsul.
+   Windows peut afficher un avertissement SmartScreen (programme non signé) : « Informations complémentaires »,
+   puis « Exécuter quand même ».
+3. Dans ses réglages, coche le démarrage automatique de la capture.
+4. Ouvre Teyvin : la première fois, le navigateur peut te demander l'accès au réseau local. Accepte.
+
+Le compagnon se met à jour tout seul, comme Irminsul.
+
+## Suivre Irminsul
+
+Chaque jour, une [GitHub Action](.github/workflows/build.yml) regarde si Irminsul a publié une nouvelle version.
+Si oui, elle reprend son code, applique la modification Teyvin, compile le `.exe` et publie une release
+`vX.Y.Z-teyvin.N`. Si la modification ne s'applique plus (Irminsul a changé aux endroits touchés), l'Action
+échoue et il faut ajuster `teyvin/apply.py`.
+
+## Crédits et licence
+
+Tout le travail de lecture du jeu vient d'[Irminsul](https://github.com/konkers/irminsul) (© 2025 Erik Gilling,
+licence MIT) et de ses bibliothèques. Ce dépôt ne contient que le relais et l'outillage, sous la même licence
+MIT. Projet de fan non officiel, sans lien avec HoYoverse ni avec les auteurs d'Irminsul : merci de ne pas leur
+signaler les problèmes du compagnon.
