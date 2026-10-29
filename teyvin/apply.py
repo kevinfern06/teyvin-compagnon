@@ -3,7 +3,7 @@
 Usage : python teyvin/apply.py <dossier irminsul> --version 0.2.2-teyvin.1 --repo propriétaire/teyvin-compagnon
 
 Le moteur d'Irminsul (lecture du jeu, mises à jour) reste intact. On ajoute le relais (src/relay.rs), on
-remplace l'écran (src/app.rs, aux couleurs de Teyvin) et on modifie trois lignes ailleurs. Chaque point
+remplace l'écran (src/app.rs, aux couleurs de Teyvin) et on modifie quelques lignes ailleurs. Chaque point
 d'ancrage doit apparaître exactement une fois ; sinon le script s'arrête avec un message clair (le code
 d'Irminsul a changé : à corriger à la main).
 """
@@ -73,6 +73,71 @@ def main() -> None:
     # 3. Mises à jour automatiques depuis les releases du compagnon (et non celles d'Irminsul)
     edit(src / "update.rs", '.repo_owner("konkers")', f'.repo_owner("{owner}")')
     edit(src / "update.rs", '.repo_name("irminsul")', f'.repo_name("{name}")')
+
+    # 3 bis. Ne proposer que plus récent : Irminsul prend la première release de la liste et la propose dès que sa
+    # version diffère ; une liste en retard (cache de GitHub) proposait alors un retour en arrière
+    edit(
+        src / "update.rs",
+        """    // Assume the first release is the latest.
+    let release = releases
+        .first()
+        .ok_or(anyhow!("No releases found"))?
+        .clone();
+
+    if release.version == self_update::cargo_crate_version!() {
+""",
+        f"""    // Plus haute version publiée, seulement si elle est plus récente que celle-ci {MARK}
+    anyhow::ensure!(!releases.is_empty(), "No releases found");
+    let Some(release) = newest_release(self_update::cargo_crate_version!(), &releases) else {{
+        tracing::info!(
+            "{{}} is current, continuing with app startup",
+            self_update::cargo_crate_version!()
+        );
+        return Ok(None);
+    }};
+
+    if release.version == self_update::cargo_crate_version!() {{
+""",
+    )
+    edit(
+        src / "update.rs",
+        "#[cfg(test)]\nmod tests {\n",
+        f"""/// La release la plus récente, si elle est plus récente que `current` (semver : 0.2.2-teyvin.11 > 0.2.2-teyvin.10). {MARK}
+fn newest_release(current: &str, releases: &[Release]) -> Option<Release> {{
+    let mut newest: Option<&Release> = None;
+    for release in releases {{
+        let base = newest.map_or(current, |n| n.version.as_str());
+        if self_update::version::bump_is_greater(base, &release.version).unwrap_or(false) {{
+            newest = Some(release);
+        }}
+    }}
+    newest.cloned()
+}}
+
+#[cfg(test)]
+mod teyvin_tests {{
+    use super::*;
+
+    fn releases(versions: &[&str]) -> Vec<Release> {{
+        versions.iter().map(|v| Release {{ version: (*v).to_owned(), ..Default::default() }}).collect()
+    }}
+
+    #[test]
+    fn offers_only_newer_versions() {{
+        let list = releases(&["0.2.2-teyvin.9", "0.2.2-teyvin.11", "0.2.2-teyvin.10"]);
+        assert_eq!(newest_release("0.2.2-teyvin.10", &list).unwrap().version, "0.2.2-teyvin.11");
+        assert_eq!(newest_release("0.2.2-teyvin.9", &list).unwrap().version, "0.2.2-teyvin.11");
+        assert!(newest_release("0.2.2-teyvin.11", &list).is_none());
+        // Liste en retard : jamais de retour en arrière
+        assert!(newest_release("0.2.2-teyvin.10", &releases(&["0.2.2-teyvin.9"])).is_none());
+        assert_eq!(newest_release("0.2.2-teyvin.11", &releases(&["0.2.3-teyvin.1"])).unwrap().version, "0.2.3-teyvin.1");
+    }}
+}}
+
+#[cfg(test)]
+mod tests {{
+""",
+    )
 
     # 4. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour
     cargo = args.irminsul / "Cargo.toml"
