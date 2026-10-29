@@ -28,6 +28,7 @@ struct Texts {
     url: &'static str,
     brand: &'static str,
     step_ready: &'static str,
+    step_launch: &'static str,
     step_game: &'static str,
     step_read: &'static str,
     step_teyvin: &'static str,
@@ -47,6 +48,7 @@ struct Texts {
     capture_off: &'static str,
     waiting: &'static str,
     open_teyvin_detail: &'static str,
+    teyvin_soon: &'static str,
     login_read: &'static str,
     with_wishes: &'static str,
     chars_inventory: &'static str,
@@ -72,6 +74,7 @@ const FR: Texts = Texts {
     url: "https://teyvin.vercel.app/compte",
     brand: "TEYVIN COMPAGNON",
     step_ready: "Compagnon prêt",
+    step_launch: "Lance le jeu",
     step_game: "Jeu connecté",
     step_read: "Compte lu",
     step_teyvin: "Teyvin à jour",
@@ -91,6 +94,7 @@ const FR: Texts = Texts {
     capture_off: "capture arrêtée",
     waiting: "en attente…",
     open_teyvin_detail: "ouvre Teyvin",
+    teyvin_soon: "dans la minute…",
     login_read: "connexion lue",
     with_wishes: "vœux compris",
     chars_inventory: "persos et inventaire",
@@ -102,7 +106,7 @@ const FR: Texts = Texts {
     waiting_game_hint: "Lance Genshin et connecte-toi. Déjà en jeu ? Reviens à l'écran de connexion.",
     reading: "Lecture du compte…",
     reading_hint: "Encore un instant.",
-    read_hint: "Ouvre Teyvin pour le mettre à jour.",
+    read_hint: "Teyvin le récupère dans la minute (tout de suite si tu rouvres son onglet).",
     all_done: "Tout est à jour",
     all_done_hint: "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin.",
     autostart: "Démarrer avec Windows",
@@ -116,6 +120,7 @@ const EN: Texts = Texts {
     url: "https://teyvin.vercel.app/en/account",
     brand: "TEYVIN COMPANION",
     step_ready: "Companion ready",
+    step_launch: "Launch the game",
     step_game: "Game connected",
     step_read: "Account read",
     step_teyvin: "Teyvin up to date",
@@ -135,6 +140,7 @@ const EN: Texts = Texts {
     capture_off: "capture stopped",
     waiting: "waiting…",
     open_teyvin_detail: "open Teyvin",
+    teyvin_soon: "within a minute…",
     login_read: "login read",
     with_wishes: "wishes included",
     chars_inventory: "characters and inventory",
@@ -146,7 +152,7 @@ const EN: Texts = Texts {
     waiting_game_hint: "Launch Genshin and log in. Already in game? Go back to the login screen.",
     reading: "Reading account…",
     reading_hint: "Just a moment.",
-    read_hint: "Open Teyvin to update it.",
+    read_hint: "Teyvin picks it up within a minute (right away if you switch back to its tab).",
     all_done: "All up to date",
     all_done_hint: "Your account is read when you log in: after farming, log in again to refresh Teyvin.",
     autostart: "Start with Windows",
@@ -352,6 +358,8 @@ struct View {
     title: String,
     subtitle: String,
     warn: bool,
+    /// Coche à côté du titre (compte lu, tout est à jour).
+    check: bool,
     steps: [(Step, &'static str, String); 4],
     /// Bouton d'action à la place de « Réduire » (démarrer la capture, mettre à jour…).
     action: Option<(&'static str, Message)>,
@@ -365,9 +373,10 @@ fn view(state: &AppState) -> View {
         title: title.to_string(),
         subtitle: subtitle.to_string(),
         warn: false,
+        check: false,
         steps: [
             (Step::Current, t.step_ready, t.starting_detail.into()),
-            (Step::Todo, t.step_game, "—".into()),
+            (Step::Todo, t.step_launch, "—".into()),
             (Step::Todo, t.step_read, "—".into()),
             (Step::Todo, t.step_teyvin, "—".into()),
         ],
@@ -400,14 +409,14 @@ fn view(state: &AppState) -> View {
             let capture = if state.capturing { Step::Done } else { Step::Current };
             let mut steps = [
                 (capture, t.step_ready, if state.capturing { t.capture_on.into() } else { t.capture_off.into() }),
-                (Step::Todo, t.step_game, t.waiting.into()),
+                (Step::Todo, t.step_launch, "—".into()),
                 (Step::Todo, t.step_read, "—".into()),
                 (Step::Todo, t.step_teyvin, t.open_teyvin_detail.into()),
             ];
             if state.capturing {
                 steps[1] = match game {
                     Some(_) => (Step::Done, t.step_game, t.login_read.into()),
-                    None => (Step::Current, t.step_game, t.waiting.into()),
+                    None => (Step::Current, t.step_launch, t.waiting.into()),
                 };
             }
             if game.is_some() {
@@ -419,7 +428,7 @@ fn view(state: &AppState) -> View {
                 steps[3] = if teyvin {
                     (Step::Done, t.step_teyvin, t.after_farm.into())
                 } else {
-                    (Step::Current, t.step_teyvin, t.open_teyvin_detail.into())
+                    (Step::Current, t.step_teyvin, t.teyvin_soon.into())
                 };
             }
 
@@ -430,7 +439,7 @@ fn view(state: &AppState) -> View {
             } else if !read {
                 (t.reading, t.reading_hint, false, None)
             } else if !teyvin {
-                (t.step_read, t.read_hint, true, None)
+                (t.step_read, t.read_hint, false, None)
             } else {
                 (t.all_done, t.all_done_hint, false, None)
             };
@@ -438,10 +447,12 @@ fn view(state: &AppState) -> View {
                 title: title.to_string(),
                 subtitle: subtitle.to_string(),
                 warn,
+                check: read,
                 steps,
                 action,
                 secondary: None,
-                spinner: !read && game.is_some(),
+                // Jusqu'à ce que Teyvin ait récupéré le compte (il interroge le relais chaque minute)
+                spinner: game.is_some() && !teyvin,
             }
         }
     }
@@ -519,7 +530,7 @@ impl IrminsulApp {
             TEAL_LIGHT,
         );
         let title = painter.text(pos2(x, y - 26.0), Align2::LEFT_BOTTOM, &v.title, FontId::proportional(30.0), INK);
-        if v.title == tx().all_done {
+        if v.check {
             painter.text(
                 pos2(title.right() + 10.0, title.center().y),
                 Align2::LEFT_CENTER,
