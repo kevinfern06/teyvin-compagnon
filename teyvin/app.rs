@@ -520,6 +520,26 @@ impl IrminsulApp {
             );
         }
 
+        // Voile sombre derrière le texte (en bas à gauche), pour la lisibilité : dégradé de gauche à droite et du
+        // haut vers le bas, le paysage reste visible ailleurs
+        let xs = [(rect.left(), 1.0), (rect.left() + rect.width() * 0.35, 0.85), (rect.left() + rect.width() * 0.7, 0.0)];
+        let ys = [(rect.top() + rect.height() * 0.38, 0.0), (rect.top() + rect.height() * 0.62, 1.0), (rect.bottom(), 1.0)];
+        let mut veil = egui::Mesh::default();
+        for (y, ay) in ys {
+            for (x, ax) in xs {
+                let alpha = (0.8 * ax * ay * 255.0) as u8;
+                veil.colored_vertex(pos2(x, y), Color32::from_rgba_unmultiplied(BG.r(), BG.g(), BG.b(), alpha));
+            }
+        }
+        for row in 0..2 {
+            for col in 0..2 {
+                let i = row * 3 + col;
+                veil.add_triangle(i, i + 1, i + 3);
+                veil.add_triangle(i + 1, i + 4, i + 3);
+            }
+        }
+        painter.add(veil);
+
         let x = rect.left() + MARGIN;
         let y = rect.bottom() - MARGIN;
         painter.text(
