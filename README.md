@@ -1,5 +1,9 @@
 # Teyvin Companion
 
+## [⬇ Télécharger Teyvin Companion (Windows)](https://github.com/kevinfern06/teyvin-compagnon/releases/latest/download/TeyvinCompanion.exe)
+
+<img src="docs/capture-fr.png" alt="La fenêtre de Teyvin Companion" width="600">
+
 Le compagnon Windows de [Teyvin](https://teyvin.app) : lance-le avant Genshin Impact, et ton compte
 Teyvin (persos, armes, artefacts, inventaire, historique de vœux) se met à jour tout seul. Plus de fichier à
 exporter ni de lien à copier-coller.

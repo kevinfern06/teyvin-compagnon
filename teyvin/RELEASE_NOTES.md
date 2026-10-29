@@ -1,3 +1,7 @@
+## [⬇ Télécharger Teyvin Companion (Windows)](https://github.com/kevinfern06/teyvin-compagnon/releases/latest/download/TeyvinCompanion.exe)
+
+<img src="https://raw.githubusercontent.com/kevinfern06/teyvin-compagnon/main/docs/capture-fr.png" alt="La fenêtre de Teyvin Companion" width="600">
+
 > 🇬🇧 **English version below.**
 
 ## ✨ Teyvin se met à jour tout seul quand tu lances le jeu
@@ -65,6 +69,10 @@ avec les auteurs d'Irminsul : merci de signaler les problèmes [ici](https://git
 ---
 
 # 🇬🇧 English
+
+## [⬇ Download Teyvin Companion (Windows)](https://github.com/kevinfern06/teyvin-compagnon/releases/latest/download/TeyvinCompanion.exe)
+
+<img src="https://raw.githubusercontent.com/kevinfern06/teyvin-compagnon/main/docs/capture-en.png" alt="The Teyvin Companion window" width="600">
 
 ## ✨ Teyvin updates itself when you launch the game
 
