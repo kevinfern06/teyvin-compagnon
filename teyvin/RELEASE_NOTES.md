@@ -17,13 +17,14 @@ exporter ni de lien à copier-coller.
 4. Sur [Teyvin](https://teyvin.vercel.app/compte), ouvre **Mon compte → Mettre à jour mon compte** et coche
    **J'utilise le compagnon**. Si ton navigateur demande l'accès au réseau local, accepte.
 5. **Lance Genshin et passe la porte** de l'écran de connexion. Quelques secondes plus tard, Teyvin affiche
-   « ton compte mis à jour ».
+   « ton compte mis à jour » (si sa page était déjà ouverte : recharge-la, ou attends une minute).
 
 ## 🎮 Au quotidien
 
 - Le compagnon lit ton compte **quand tu passes la porte** de l'écran de connexion (pas en direct pendant que tu
   joues).
-  Après une grosse session de farm : **menu Paimon → déconnexion → reconnexion**, et Teyvin est à jour.
+  Après une grosse session de farm : **menu Paimon → déconnexion → reconnexion**, puis **recharge la page de
+  Teyvin** (ou attends une minute) : il est à jour.
 - **Vœux** : ouvre une fois l'historique des vœux en jeu, puis Teyvin les relit tout seul toutes les 30 minutes
   (le jeu les affiche lui-même avec environ 1 h de retard).
 - La fenêtre te dit où tu en es : compagnon prêt → jeu connecté → compte lu → Teyvin à jour.
@@ -81,13 +82,14 @@ files to export or links to copy and paste.
 4. On [Teyvin](https://teyvin.vercel.app/en/account), open **My account → Update my account** and tick
    **I use the companion**. If your browser asks for local network access, allow it.
 5. **Launch Genshin and go through the door** on the login screen. A few seconds later, Teyvin shows
-   "your account updated".
+   "your account updated" (if its page was already open: reload it, or wait a minute).
 
 ## 🎮 Day to day
 
 - The companion reads your account **when you go through the door** on the login screen (not live while you
   play).
-  After a big farming session: **Paimon Menu → log out → log back in**, and Teyvin is up to date.
+  After a big farming session: **Paimon Menu → log out → log back in**, then **reload the Teyvin page** (or wait
+  a minute): it's up to date.
 - **Wishes**: open the Wish History in game once, then Teyvin reads it again on its own every 30 minutes
   (the game itself shows wishes with about a 1-hour delay).
 - The window tells you where you stand: companion ready → game connected → account read → Teyvin up to date.
