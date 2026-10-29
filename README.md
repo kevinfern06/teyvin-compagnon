@@ -1,6 +1,6 @@
 # Teyvin Compagnon
 
-Le compagnon Windows de [Teyvin](https://teyvin.vercel.app) : lance-le avant Genshin Impact, et ton compte
+Le compagnon Windows de [Teyvin](https://teyvin.app) : lance-le avant Genshin Impact, et ton compte
 Teyvin (persos, armes, artefacts, inventaire, historique de vœux) se met à jour tout seul. Plus de fichier à
 exporter ni de lien à copier-coller.
 

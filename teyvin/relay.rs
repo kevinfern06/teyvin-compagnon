@@ -21,7 +21,13 @@ use tokio::sync::watch;
 pub const PORT: u16 = 47317;
 
 /// Sites autorisés à lire les données (production et développement local).
-const ORIGINS: &[&str] = &["https://teyvin.vercel.app", "http://localhost:3000"];
+const ORIGINS: &[&str] = &[
+    "https://teyvin.app",
+    "https://www.teyvin.app",
+    // Ancienne adresse, le temps que les joueurs passent sur teyvin.app
+    "https://teyvin.vercel.app",
+    "http://localhost:3000",
+];
 
 struct Snapshot {
     good: String,

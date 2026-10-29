@@ -71,7 +71,7 @@ struct Texts {
 }
 
 const FR: Texts = Texts {
-    url: "https://teyvin.vercel.app/compte",
+    url: "https://teyvin.app/compte",
     brand: "TEYVIN COMPAGNON",
     step_ready: "Compagnon prêt",
     step_launch: "Lance le jeu",
@@ -117,7 +117,7 @@ const FR: Texts = Texts {
 };
 
 const EN: Texts = Texts {
-    url: "https://teyvin.vercel.app/en/account",
+    url: "https://teyvin.app/en/account",
     brand: "TEYVIN COMPANION",
     step_ready: "Companion ready",
     step_launch: "Launch the game",

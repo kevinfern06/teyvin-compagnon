@@ -3,7 +3,7 @@
 ## ✨ Teyvin se met à jour tout seul quand tu lances le jeu
 
 Teyvin Compagnon lit ton compte Genshin quand tu passes la porte de l'écran de connexion (persos, armes, artefacts,
-matériaux, vœux) et le transmet à [Teyvin](https://teyvin.vercel.app) **sur ton ordinateur**. Plus aucun fichier à
+matériaux, vœux) et le transmet à [Teyvin](https://teyvin.app) **sur ton ordinateur**. Plus aucun fichier à
 exporter ni de lien à copier-coller.
 
 ## 🚀 Installation (2 minutes)
@@ -14,7 +14,7 @@ exporter ni de lien à copier-coller.
    - Si Windows affiche « Windows a protégé votre ordinateur » : clique **Informations complémentaires**, puis
      **Exécuter quand même** (le programme n'est simplement pas signé, comme Irminsul).
 3. Dans la fenêtre du compagnon, coche **Démarrer avec Windows** : tu n'auras plus jamais à y penser.
-4. Sur [Teyvin](https://teyvin.vercel.app/compte), ouvre **Mon compte → Mettre à jour mon compte** et coche
+4. Sur [Teyvin](https://teyvin.app/compte), ouvre **Mon compte → Mettre à jour mon compte** et coche
    **J'utilise le compagnon**. Si ton navigateur demande l'accès au réseau local, accepte.
 5. **Lance Genshin et passe la porte** de l'écran de connexion. Quelques secondes plus tard, Teyvin affiche
    « ton compte mis à jour » (si sa page était déjà ouverte : recharge-la, ou attends une minute).
@@ -68,7 +68,7 @@ avec les auteurs d'Irminsul : merci de signaler les problèmes [ici](https://git
 ## ✨ Teyvin updates itself when you launch the game
 
 Teyvin Companion reads your Genshin account when you go through the door on the login screen (characters, weapons,
-artifacts, materials, wishes) and hands it to [Teyvin](https://teyvin.vercel.app/en) **on your computer**. No more
+artifacts, materials, wishes) and hands it to [Teyvin](https://teyvin.app/en) **on your computer**. No more
 files to export or links to copy and paste.
 
 ## 🚀 Installation (2 minutes)
@@ -79,7 +79,7 @@ files to export or links to copy and paste.
    - If Windows shows "Windows protected your PC": click **More info**, then **Run anyway** (the program simply
      isn't signed, just like Irminsul).
 3. In the companion window, tick **Start with Windows**: you'll never have to think about it again.
-4. On [Teyvin](https://teyvin.vercel.app/en/account), open **My account → Update my account** and tick
+4. On [Teyvin](https://teyvin.app/en/account), open **My account → Update my account** and tick
    **I use the companion**. If your browser asks for local network access, allow it.
 5. **Launch Genshin and go through the door** on the login screen. A few seconds later, Teyvin shows
    "your account updated" (if its page was already open: reload it, or wait a minute).
