@@ -63,7 +63,6 @@ struct Texts {
     read_hint: &'static str,
     all_done: &'static str,
     all_done_hint: &'static str,
-    autostart: &'static str,
     open_teyvin: &'static str,
     minimize: &'static str,
     logs: &'static str,
@@ -109,7 +108,6 @@ const FR: Texts = Texts {
     read_hint: "Teyvin se met à jour : recharge sa page, ou attends une minute.",
     all_done: "Tout est à jour",
     all_done_hint: "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin.",
-    autostart: "Démarrer avec Windows",
     open_teyvin: "Ouvrir Teyvin",
     minimize: "Réduire",
     logs: "Journaux",
@@ -155,7 +153,6 @@ const EN: Texts = Texts {
     read_hint: "Teyvin is updating: reload its page, or wait a minute.",
     all_done: "All up to date",
     all_done_hint: "Your account is read when you log in: after farming, log in again to refresh Teyvin.",
-    autostart: "Start with Windows",
     open_teyvin: "Open Teyvin",
     minimize: "Minimize",
     logs: "Logs",
@@ -238,8 +235,6 @@ pub struct IrminsulApp {
     ui_message_tx: mpsc::UnboundedSender<Message>,
     state_rx: watch::Receiver<AppState>,
     saved_state: SavedAppState,
-    /// Tâche planifiée « Démarrer avec Windows » présente ?
-    autostart: bool,
     download_acknowledged: bool,
     restarting: bool,
 }
@@ -318,7 +313,6 @@ impl IrminsulApp {
             ui_message_tx,
             state_rx,
             saved_state,
-            autostart: autostart::enabled(),
             download_acknowledged: false,
             restarting: false,
         }
@@ -640,23 +634,11 @@ impl IrminsulApp {
         }
     }
 
-    /// Démarrer avec Windows, action du moment, ouvrir Teyvin ; version et journaux tout en bas.
+    /// Action du moment, ouvrir Teyvin ; version et journaux tout en bas.
     fn footer(&mut self, ui: &mut egui::Ui, full: Rect, v: &View) {
         let t = tx();
         let y =full.top() + BANNER_HEIGHT + 4.0 + 92.0 + 22.0;
         let h = 34.0;
-
-        let mut autostart = self.autostart;
-        let toggle = Rect::from_min_size(pos2(full.left() + MARGIN, y), vec2(240.0, h));
-        if ui
-            .put(toggle, egui::Checkbox::new(&mut autostart, RichText::new(t.autostart).color(INK).size(14.0)))
-            .changed()
-        {
-            match autostart::set(autostart) {
-                Ok(()) => self.autostart = autostart,
-                Err(e) => tracing::error!("Teyvin : démarrage avec Windows impossible : {e}"),
-            }
-        }
 
         let open = Rect::from_min_size(pos2(full.right() - MARGIN - 170.0, y), vec2(170.0, h));
         let open_label = format!("{}  {}", t.open_teyvin, egui_material_icons::icons::ICON_OPEN_IN_NEW);
@@ -726,53 +708,5 @@ fn clone_message(msg: &Message) -> Message {
         Message::DownloadAcknowledged => Message::DownloadAcknowledged,
         Message::StopCapture => Message::StopCapture,
         _ => Message::StartCapture,
-    }
-}
-
-/// « Démarrer avec Windows » : tâche planifiée à l'ouverture de session, avec les droits administrateur
-/// (le compagnon en a besoin pour lire le jeu ; une tâche « plus haut niveau » évite la question de Windows).
-mod autostart {
-    const TASK: &str = "Teyvin Compagnon";
-
-    #[cfg(windows)]
-    fn schtasks(args: &str) -> std::io::Result<std::process::ExitStatus> {
-        use std::os::windows::process::CommandExt;
-        const CREATE_NO_WINDOW: u32 = 0x0800_0000;
-        std::process::Command::new("schtasks")
-            .raw_arg(args)
-            .creation_flags(CREATE_NO_WINDOW)
-            .stdout(std::process::Stdio::null())
-            .stderr(std::process::Stdio::null())
-            .status()
-    }
-
-    #[cfg(windows)]
-    pub fn enabled() -> bool {
-        schtasks(&format!("/Query /TN \"{TASK}\"")).is_ok_and(|s| s.success())
-    }
-
-    #[cfg(windows)]
-    pub fn set(on: bool) -> anyhow::Result<()> {
-        let status = if on {
-            let exe = std::env::current_exe()?;
-            schtasks(&format!(
-                "/Create /TN \"{TASK}\" /TR \"\\\"{}\\\"\" /SC ONLOGON /RL HIGHEST /F",
-                exe.display()
-            ))?
-        } else {
-            schtasks(&format!("/Delete /TN \"{TASK}\" /F"))?
-        };
-        anyhow::ensure!(status.success(), "schtasks a échoué ({status})");
-        Ok(())
-    }
-
-    #[cfg(not(windows))]
-    pub fn enabled() -> bool {
-        false
-    }
-
-    #[cfg(not(windows))]
-    pub fn set(_on: bool) -> anyhow::Result<()> {
-        anyhow::bail!("seulement sous Windows")
     }
 }

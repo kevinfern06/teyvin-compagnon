@@ -18,7 +18,7 @@ exporter ni de lien à copier-coller.
    jeu, avec l'outil intégré à Windows.
    - Si Windows affiche « Windows a protégé votre ordinateur » : clique **Informations complémentaires**, puis
      **Exécuter quand même** (le programme n'est simplement pas signé, comme Irminsul).
-3. Dans la fenêtre du compagnon, coche **Démarrer avec Windows** : tu n'auras plus jamais à y penser.
+3. Pense à le **lancer avant le jeu** à chaque fois (comme Irminsul).
 4. Sur [Teyvin](https://teyvin.app/compte), ouvre **Mon compte → Mettre à jour mon compte** et coche
    **J'utilise le compagnon**. Si ton navigateur demande l'accès au réseau local, accepte.
 5. **Lance Genshin et passe la porte** de l'écran de connexion. Quelques secondes plus tard, Teyvin affiche
@@ -88,7 +88,7 @@ files to export or links to copy and paste.
    traffic, with the tool built into Windows.
    - If Windows shows "Windows protected your PC": click **More info**, then **Run anyway** (the program simply
      isn't signed, just like Irminsul).
-3. In the companion window, tick **Start with Windows**: you'll never have to think about it again.
+3. Remember to **launch it before the game** each time (like Irminsul).
 4. On [Teyvin](https://teyvin.app/en/account), open **My account → Update my account** and tick
    **I use the companion**. If your browser asks for local network access, allow it.
 5. **Launch Genshin and go through the door** on the login screen. A few seconds later, Teyvin shows
