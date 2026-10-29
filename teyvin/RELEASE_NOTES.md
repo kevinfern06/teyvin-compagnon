@@ -1,10 +1,10 @@
 > 🇬🇧 **English version below.**
 
-## ✨ Teyvin se met à jour tout seul quand tu joues
+## ✨ Teyvin se met à jour tout seul quand tu lances le jeu
 
-Teyvin Compagnon lit ton compte Genshin à chaque connexion au jeu (persos, armes, artefacts, matériaux, vœux) et le
-transmet à [Teyvin](https://teyvin.vercel.app) **sur ton ordinateur**. Plus aucun fichier à exporter ni de lien à
-copier-coller.
+Teyvin Compagnon lit ton compte Genshin quand tu passes la porte de l'écran de connexion (persos, armes, artefacts,
+matériaux, vœux) et le transmet à [Teyvin](https://teyvin.vercel.app) **sur ton ordinateur**. Plus aucun fichier à
+exporter ni de lien à copier-coller.
 
 ## 🚀 Installation (2 minutes)
 
@@ -16,11 +16,13 @@ copier-coller.
 3. Dans la fenêtre du compagnon, coche **Démarrer avec Windows** : tu n'auras plus jamais à y penser.
 4. Sur [Teyvin](https://teyvin.vercel.app/compte), ouvre **Mon compte → Mettre à jour mon compte** et coche
    **J'utilise le compagnon**. Si ton navigateur demande l'accès au réseau local, accepte.
-5. **Lance Genshin et connecte-toi.** Quelques secondes plus tard, Teyvin affiche « ton compte mis à jour ».
+5. **Lance Genshin et passe la porte** de l'écran de connexion. Quelques secondes plus tard, Teyvin affiche
+   « ton compte mis à jour ».
 
 ## 🎮 Au quotidien
 
-- Le compagnon lit ton compte **à la connexion au jeu** (pas en direct pendant que tu joues).
+- Le compagnon lit ton compte **quand tu passes la porte** de l'écran de connexion (pas en direct pendant que tu
+  joues).
   Après une grosse session de farm : **menu Paimon → déconnexion → reconnexion**, et Teyvin est à jour.
 - **Vœux** : ouvre une fois l'historique des vœux en jeu, puis Teyvin les relit tout seul toutes les 30 minutes
   (le jeu les affiche lui-même avec environ 1 h de retard).
@@ -62,11 +64,11 @@ avec les auteurs d'Irminsul : merci de signaler les problèmes [ici](https://git
 
 # 🇬🇧 English
 
-## ✨ Teyvin updates itself while you play
+## ✨ Teyvin updates itself when you launch the game
 
-Teyvin Companion reads your Genshin account every time you log in to the game (characters, weapons, artifacts,
-materials, wishes) and hands it to [Teyvin](https://teyvin.vercel.app/en) **on your computer**. No more files to
-export or links to copy and paste.
+Teyvin Companion reads your Genshin account when you go through the door on the login screen (characters, weapons,
+artifacts, materials, wishes) and hands it to [Teyvin](https://teyvin.vercel.app/en) **on your computer**. No more
+files to export or links to copy and paste.
 
 ## 🚀 Installation (2 minutes)
 
@@ -78,11 +80,13 @@ export or links to copy and paste.
 3. In the companion window, tick **Start with Windows**: you'll never have to think about it again.
 4. On [Teyvin](https://teyvin.vercel.app/en/account), open **My account → Update my account** and tick
    **I use the companion**. If your browser asks for local network access, allow it.
-5. **Launch Genshin and log in.** A few seconds later, Teyvin shows "your account updated".
+5. **Launch Genshin and go through the door** on the login screen. A few seconds later, Teyvin shows
+   "your account updated".
 
 ## 🎮 Day to day
 
-- The companion reads your account **when you log in to the game** (not live while you play).
+- The companion reads your account **when you go through the door** on the login screen (not live while you
+  play).
   After a big farming session: **Paimon Menu → log out → log back in**, and Teyvin is up to date.
 - **Wishes**: open the Wish History in game once, then Teyvin reads it again on its own every 30 minutes
   (the game itself shows wishes with about a 1-hour delay).
