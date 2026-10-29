@@ -115,6 +115,11 @@ jobs:
           fi
           exit "$status"
 
+      # Tests de nos modifications (mise à jour : jamais de retour en arrière) : un échec bloque la release
+      - name: Tests Teyvin
+        working-directory: irminsul
+        run: cargo test --release teyvin_tests
+
       - name: Release
         env:
           GH_TOKEN: ${{ github.token }}
