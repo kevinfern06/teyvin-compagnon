@@ -134,6 +134,24 @@ jobs:
             -R "$GITHUB_REPOSITORY" \
             --title "Teyvin Compagnon $VERSION" \
             --notes-file notes.md
+          # Les anciens compagnons (avant teyvin.12) prennent la première release de la liste publique. GitHub la
+          # trie par jour puis par nom de tag en texte (« teyvin.9 » avant « teyvin.14 » le même jour) : on vérifie
+          # que la nouvelle passe bien en tête, sinon les joueurs ne voient pas la mise à jour.
+          if [ "$DRAFT" != "true" ]; then
+            # Sans jeton, comme les compagnons (avec, les brouillons apparaissent aussi)
+            # (la liste publique peut avoir un peu de retard : quelques essais)
+            for i in 1 2 3 4 5 6; do
+              first=$(curl -sf "https://api.github.com/repos/$GITHUB_REPOSITORY/releases?per_page=1" | jq -r '.[0].tag_name' || true)
+              [ "$first" = "v$VERSION" ] && break
+              sleep 20
+            done
+            if [ -z "$first" ]; then
+              echo "::warning title=Ordre des releases::liste publique illisible, ordre non vérifié"
+            elif [ "$first" != "v$VERSION" ]; then
+              echo "::error title=Ordre des releases::$first passe avant v$VERSION dans la liste publique : les anciens compagnons ne verront pas la mise à jour (repasser $first en brouillon)."
+              exit 1
+            fi
+          fi
           if [ "$DRAFT" = "true" ]; then
             gh issue create -R "$GITHUB_REPOSITORY" \
               --title "Irminsul $UPSTREAM : brouillon v$VERSION à vérifier" \
