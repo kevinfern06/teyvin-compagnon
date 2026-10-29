@@ -124,15 +124,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          # TeyvinCompanion.exe pour les joueurs ; l'ancien nom reste pour la mise à jour automatique (elle cherche
+          # un fichier contenant « windows-x64 », y compris dans les versions déjà installées)
+          cp irminsul/target/release/irminsul.exe TeyvinCompanion.exe
           cp irminsul/target/release/irminsul.exe teyvin-compagnon-windows-x64.exe
           sha=$(git -C irminsul rev-parse HEAD)
           draft_flag=""
           if [ "$DRAFT" = "true" ]; then draft_flag="--draft"; fi
           # Description : teyvin/RELEASE_NOTES.md, avec la version et le commit d'Irminsul
           sed -e "s/__UPSTREAM__/$UPSTREAM/g" -e "s/__SHA__/$sha/g" compagnon/teyvin/RELEASE_NOTES.md > notes.md
-          gh release create "v$VERSION" teyvin-compagnon-windows-x64.exe $draft_flag \
+          gh release create "v$VERSION" TeyvinCompanion.exe teyvin-compagnon-windows-x64.exe $draft_flag \
             -R "$GITHUB_REPOSITORY" \
-            --title "Teyvin Compagnon $VERSION" \
+            --title "Teyvin Companion $VERSION" \
             --notes-file notes.md
           # Les anciens compagnons (avant teyvin.12) prennent la première release de la liste publique. GitHub la
           # trie par jour puis par nom de tag en texte (« teyvin.9 » avant « teyvin.14 » le même jour) : on vérifie

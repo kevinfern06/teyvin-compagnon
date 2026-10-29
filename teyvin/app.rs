@@ -72,7 +72,7 @@ struct Texts {
 
 const FR: Texts = Texts {
     url: "https://teyvin.app/compte",
-    brand: "TEYVIN COMPAGNON",
+    brand: "TEYVIN COMPANION",
     step_ready: "Compagnon prêt",
     step_launch: "Lance le jeu",
     step_game: "Jeu connecté",

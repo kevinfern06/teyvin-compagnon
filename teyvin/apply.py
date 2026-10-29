@@ -16,6 +16,8 @@ from pathlib import Path
 
 HERE = Path(__file__).resolve().parent
 MARK = "// Teyvin Compagnon"
+NAME = "Teyvin Companion"
+FILE = "TeyvinCompanion.exe"
 
 
 def edit(path: Path, anchor: str, replacement: str) -> None:
@@ -137,6 +139,22 @@ mod teyvin_tests {{
 #[cfg(test)]
 mod tests {{
 """,
+    )
+
+    # 3 ter. Nom « Teyvin Companion » : titre de la fenêtre (barre des tâches) et détails du .exe (gestionnaire des
+    # tâches). Le nom interne « Irminsul » reste : il fixe le dossier des réglages et des journaux
+    edit(
+        src / "main.rs",
+        "            .with_decorations(false)\n",
+        f'            .with_decorations(false)\n            .with_title("{NAME}") {MARK}\n',
+    )
+    edit(
+        args.irminsul / "build.rs",
+        '            .set_icon("assets/icon.ico")\n',
+        '            .set_icon("assets/icon.ico")\n'
+        f'            .set("ProductName", "{NAME}") {MARK}\n'
+        f'            .set("FileDescription", "{NAME}")\n'
+        f'            .set("OriginalFilename", "{FILE}")\n',
     )
 
     # 4. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour

@@ -1,4 +1,4 @@
-# Teyvin Compagnon
+# Teyvin Companion
 
 Le compagnon Windows de [Teyvin](https://teyvin.app) : lance-le avant Genshin Impact, et ton compte
 Teyvin (persos, armes, artefacts, inventaire, historique de vœux) se met à jour tout seul. Plus de fichier à
@@ -6,7 +6,7 @@ exporter ni de lien à copier-coller.
 
 ## Comment ça marche
 
-Teyvin Compagnon est [Irminsul](https://github.com/konkers/irminsul) de Konkers, sans changement, avec un petit
+Teyvin Companion est [Irminsul](https://github.com/konkers/irminsul) de Konkers, sans changement, avec un petit
 **relais local** en plus :
 
 - Irminsul lit ton compte quand tu te connectes au jeu, comme d'habitude ;
@@ -22,7 +22,7 @@ et on modifie trois lignes ailleurs. Le tout est appliqué par [`teyvin/apply.py
 
 ## Installation
 
-1. Télécharge `teyvin-compagnon-windows-x64.exe` dans les [releases](../../releases/latest).
+1. Télécharge `TeyvinCompanion.exe` dans les [releases](../../releases/latest).
 2. Lance-le **avant** le jeu. Il demande les droits administrateur pour lire le trafic du jeu, comme Irminsul.
    Windows peut afficher un avertissement SmartScreen (programme non signé) : « Informations complémentaires »,
    puis « Exécuter quand même ».

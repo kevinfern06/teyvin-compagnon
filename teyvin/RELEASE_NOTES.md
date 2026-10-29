@@ -2,13 +2,14 @@
 
 ## ✨ Teyvin se met à jour tout seul quand tu lances le jeu
 
-Teyvin Compagnon lit ton compte Genshin quand tu passes la porte de l'écran de connexion (persos, armes, artefacts,
+Teyvin Companion lit ton compte Genshin quand tu passes la porte de l'écran de connexion (persos, armes, artefacts,
 matériaux, vœux) et le transmet à [Teyvin](https://teyvin.app) **sur ton ordinateur**. Plus aucun fichier à
 exporter ni de lien à copier-coller.
 
 ## 🚀 Installation (2 minutes)
 
-1. **Télécharge** `teyvin-compagnon-windows-x64.exe` ci-dessous (dans « Assets »).
+1. **Télécharge** `TeyvinCompanion.exe` ci-dessous (dans « Assets ») ; l'autre `.exe`, identique, sert aux mises
+   à jour automatiques.
 2. **Lance-le.** Windows demande l'autorisation administrateur : clique « Oui ». Elle sert à lire le trafic réseau du
    jeu, avec l'outil intégré à Windows.
    - Si Windows affiche « Windows a protégé votre ordinateur » : clique **Informations complémentaires**, puis
@@ -73,7 +74,8 @@ files to export or links to copy and paste.
 
 ## 🚀 Installation (2 minutes)
 
-1. **Download** `teyvin-compagnon-windows-x64.exe` below (under "Assets").
+1. **Download** `TeyvinCompanion.exe` below (under "Assets"); the other, identical `.exe` is used for automatic
+   updates.
 2. **Run it.** Windows asks for administrator permission: click "Yes". It is used to read the game's network
    traffic, with the tool built into Windows.
    - If Windows shows "Windows protected your PC": click **More info**, then **Run anyway** (the program simply
