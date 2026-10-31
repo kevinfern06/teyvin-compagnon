@@ -157,6 +157,31 @@ mod tests {{
         f'            .set("OriginalFilename", "{FILE}")\n',
     )
 
+    # 3 quater. Échelle de Windows : le compagnon suit celle de l'écran principal (« system » dans le manifeste) au
+    # lieu de changer d'échelle en passant d'un écran à l'autre. Sa fenêtre sans bordure, glissée entre un écran à
+    # 100 % et un écran à 125 %, accrochait à la limite et changeait brusquement de taille ; Windows l'agrandit
+    # désormais lui-même sur l'autre écran (un peu moins net), comme les applications classiques
+    edit(
+        args.irminsul / "build.rs",
+        "            .compile()?;\n",
+        f"            .set_manifest(TEYVIN_MANIFEST) {MARK}\n            .compile()?;\n",
+    )
+    edit(
+        args.irminsul / "build.rs",
+        "#[tokio::main]\n",
+        f"""{MARK} : échelle de Windows (voir teyvin/apply.py)
+const TEYVIN_MANIFEST: &str = r#"<assembly xmlns="urn:schemas-microsoft-com:asm.v1" manifestVersion="1.0">
+  <application xmlns="urn:schemas-microsoft-com:asm.v3">
+    <windowsSettings>
+      <dpiAware xmlns="http://schemas.microsoft.com/SMI/2005/WindowsSettings">true</dpiAware>
+      <dpiAwareness xmlns="http://schemas.microsoft.com/SMI/2016/WindowsSettings">system</dpiAwareness>
+    </windowsSettings>
+  </application>
+</assembly>"#;
+
+#[tokio::main]\n""",
+    )
+
     # 4. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour
     cargo = args.irminsul / "Cargo.toml"
     text = cargo.read_bytes().decode("utf-8")
