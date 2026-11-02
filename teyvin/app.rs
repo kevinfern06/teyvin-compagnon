@@ -7,11 +7,12 @@
 //! anglais sinon.
 
 use std::sync::OnceLock;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use egui::{
-    Align2, Button, Color32, Context, CornerRadius, FontId, Id, OpenUrl, PointerButton, Rect,
+    Align2, Button, Checkbox, Color32, Context, CornerRadius, FontId, Id, PointerButton, Rect,
     RichText, Sense, Stroke, StrokeKind, Vec2, ViewportCommand, pos2, vec2,
 };
 use serde::{Deserialize, Serialize};
@@ -63,6 +64,7 @@ struct Texts {
     open_teyvin: &'static str,
     minimize: &'static str,
     logs: &'static str,
+    auto_open: &'static str,
     credit: &'static str,
 }
 
@@ -87,7 +89,7 @@ const FR: Texts = Texts {
     capture_off: "capture arrêtée",
     waiting: "en attente…",
     open_teyvin_detail: "ouvre Teyvin",
-    teyvin_soon: "recharge sa page…",
+    teyvin_soon: "encore quelques secondes…",
     login_read: "connexion lue",
     with_wishes: "vœux compris",
     chars_inventory: "persos et inventaire",
@@ -99,12 +101,13 @@ const FR: Texts = Texts {
     waiting_game_hint: "Lance Genshin et connecte-toi. Déjà en jeu ? Déconnecte-toi (menu Paimon, la porte) puis reconnecte-toi.",
     reading: "Lecture du compte…",
     reading_hint: "Encore un instant.",
-    read_hint: "Teyvin se met à jour : recharge sa page, ou attends une minute.",
+    read_hint: "Teyvin se met à jour : sa page ouverte le fera dans quelques secondes.",
     all_done: "Tout est à jour",
     all_done_hint: "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin.",
     open_teyvin: "Ouvrir Teyvin",
     minimize: "Réduire",
     logs: "Journaux",
+    auto_open: "Ouvrir Teyvin tout seul",
     credit: "v{v} · basé sur Irminsul de Konkers",
 };
 
@@ -129,7 +132,7 @@ const EN: Texts = Texts {
     capture_off: "capture stopped",
     waiting: "waiting…",
     open_teyvin_detail: "open Teyvin",
-    teyvin_soon: "reload its page…",
+    teyvin_soon: "a few more seconds…",
     login_read: "login read",
     with_wishes: "wishes included",
     chars_inventory: "characters and inventory",
@@ -141,12 +144,13 @@ const EN: Texts = Texts {
     waiting_game_hint: "Launch Genshin and log in. Already in game? Log out (Paimon menu, the door), then log back in.",
     reading: "Reading account…",
     reading_hint: "Just a moment.",
-    read_hint: "Teyvin is updating: reload its page, or wait a minute.",
+    read_hint: "Teyvin is updating: its open page will do so within seconds.",
     all_done: "All up to date",
     all_done_hint: "Your account is read when you log in: after farming, log in again to refresh Teyvin.",
     open_teyvin: "Open Teyvin",
     minimize: "Minimize",
     logs: "Logs",
+    auto_open: "Open Teyvin on its own",
     credit: "v{v} · based on Irminsul by Konkers",
 };
 
@@ -196,6 +200,12 @@ pub struct SavedAppState {
     export_settings: ExportSettings,
     #[serde(default)]
     tracing_level: TracingLevel,
+    #[serde(default = "auto_open_default")]
+    auto_open: bool,
+}
+
+const fn auto_open_default() -> bool {
+    true
 }
 
 impl Default for SavedAppState {
@@ -218,6 +228,7 @@ impl Default for SavedAppState {
                 min_weapon_rarity: 3,
             },
             tracing_level: Default::default(),
+            auto_open: auto_open_default(),
         }
     }
 }
@@ -229,6 +240,33 @@ pub struct IrminsulApp {
     download_acknowledged: bool,
 }
 
+/// Réglage du joueur, lu par `open_teyvin_with_game`.
+static AUTO_OPEN: AtomicBool = AtomicBool::new(true);
+
+/// Ouvre Teyvin une fois, dès que Genshin est lancé : les joueurs s'en servent pendant qu'ils jouent, et la page se
+/// met à jour toute seule une fois le compte lu. Dans son propre fil : l'écran ne se redessine plus quand la fenêtre
+/// est réduite.
+fn open_teyvin_with_game() {
+    // Une page déjà ouverte se signale au relais toutes les 15 s : on lui laisse le temps de le faire
+    const SITE_CAN_ANSWER: Duration = Duration::from_secs(20);
+    let started = Instant::now();
+    thread::spawn(move || {
+        loop {
+            thread::sleep(Duration::from_secs(2));
+            if !AUTO_OPEN.load(Ordering::Relaxed)
+                || started.elapsed() < SITE_CAN_ANSWER
+                || crate::relay::game_started_ms().is_none()
+            {
+                continue;
+            }
+            if !crate::relay::site_open() {
+                crate::relay::open_site(tx().url);
+            }
+            return;
+        }
+    });
+}
+
 /// Même démarrage qu'Irminsul : mises à jour, lien des vœux, moniteur de capture (dans un runtime tokio).
 fn start_async_runtime(
     egui_ctx: Context,
@@ -238,6 +276,7 @@ fn start_async_runtime(
     let (state_tx, state_rx) = watch::channel(AppState::new());
     let (wish_url_tx, wish_url_rx) = watch::channel(None);
     crate::relay::start(wish_url_rx);
+    open_teyvin_with_game();
     // Pas de journal des paquets bruts (outil de débogage d'Irminsul)
     let (_log_packets_tx, log_packets_rx) = watch::channel(false);
     let mut updater_state_rx = state_rx.clone();
@@ -292,6 +331,7 @@ impl IrminsulApp {
             .and_then(|storage| eframe::get_value(storage, eframe::APP_KEY))
             .unwrap_or_default();
         tracing_reload_handle.set_filter(saved_state.tracing_level.get_filter());
+        AUTO_OPEN.store(saved_state.auto_open, Ordering::Relaxed);
 
         let (ui_message_tx, state_rx) = start_async_runtime(cc.egui_ctx.clone(), capture_backend);
         // La capture démarre toujours seule : c'est tout l'intérêt du compagnon
@@ -417,7 +457,7 @@ fn view(state: &AppState) -> View {
                 steps,
                 action,
                 secondary: None,
-                // Jusqu'à ce que Teyvin ait récupéré le compte (il interroge le relais chaque minute)
+                // Jusqu'à ce que Teyvin ait récupéré le compte (il interroge le relais toutes les 15 s)
                 spinner: game.is_some() && !teyvin,
             }
         }
@@ -617,7 +657,7 @@ impl IrminsulApp {
             .fill(TEAL)
             .corner_radius(8);
         if ui.put(open, open_button).clicked() {
-            ui.ctx().open_url(OpenUrl::new_tab(t.url));
+            crate::relay::open_site(t.url);
         }
 
         // Action du moment (mettre à jour, démarrer la capture), sinon « Réduire »
@@ -634,7 +674,7 @@ impl IrminsulApp {
                 let msg = clone_message(msg);
                 if ui.put(second, outline(label)).clicked() {
                     if matches!(msg, Message::UpdateAcknowledged) {
-                        ui.ctx().open_url(OpenUrl::new_tab(t.download_url));
+                        crate::relay::open_site(t.download_url);
                     }
                     self.send(msg);
                 }
@@ -649,6 +689,15 @@ impl IrminsulApp {
                 if ui.put(second, outline(t.minimize)).clicked() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
                 }
+            }
+        }
+
+        // Réglage de l'ouverture automatique, sauf si une action prend la place
+        if v.secondary.is_none() {
+            let room = Rect::from_min_max(pos2(full.left() + MARGIN, y), pos2(second.left() - 10.0, y + h));
+            let label = RichText::new(t.auto_open).size(12.5).color(MUTED);
+            if ui.put(room, Checkbox::new(&mut self.saved_state.auto_open, label)).changed() {
+                AUTO_OPEN.store(self.saved_state.auto_open, Ordering::Relaxed);
             }
         }
 

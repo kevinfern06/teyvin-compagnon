@@ -38,6 +38,10 @@ struct Snapshot {
 static LATEST: Mutex<Option<Snapshot>> = Mutex::new(None);
 /// Dernière fois que le site Teyvin a lu l'export (millisecondes depuis l'époque Unix).
 static SYNCED_AT: Mutex<Option<u128>> = Mutex::new(None);
+/// Dernière fois qu'une page de Teyvin a interrogé le relais.
+static SITE_SEEN_AT: Mutex<Option<u128>> = Mutex::new(None);
+/// Une page de Teyvin ouverte passe toutes les 15 s ; le navigateur ralentit un onglet en arrière-plan.
+const SITE_OPEN_MS: u128 = 3 * 60_000;
 static WISH: OnceLock<watch::Receiver<Option<String>>> = OnceLock::new();
 
 /// Réglages d'export par défaut d'Irminsul, repris tels quels (ils suivent ses mises à jour).
@@ -63,6 +67,11 @@ pub fn exported_at() -> Option<u128> {
 /// Heure de la dernière lecture par Teyvin.
 pub fn synced_at() -> Option<u128> {
     SYNCED_AT.lock().ok().and_then(|s| *s)
+}
+
+/// Une page de Teyvin est-elle ouverte ? Elle récupère alors le compte toute seule.
+pub fn site_open() -> bool {
+    SITE_SEEN_AT.lock().ok().and_then(|s| *s).is_some_and(|t| now_ms().saturating_sub(t) < SITE_OPEN_MS)
 }
 
 /// Lien de l'historique de vœux trouvé ?
@@ -165,8 +174,11 @@ fn handle(mut stream: TcpStream) -> anyhow::Result<()> {
     let path = req.path.split('?').next().unwrap_or_default();
     match path {
         "/status" => {
-            // Teyvin passe ici chaque minute : s'il a déjà l'export le plus récent, il est à jour
+            // Teyvin passe ici régulièrement : s'il a déjà l'export le plus récent, il est à jour
             if allowed.is_some() {
+                if let Ok(mut seen) = SITE_SEEN_AT.lock() {
+                    *seen = Some(now_ms());
+                }
                 if let (Ok(mut s), Some(exp)) = (SYNCED_AT.lock(), exported_at()) {
                     if s.is_some_and(|t| t >= exp) {
                         *s = Some(now_ms());
@@ -298,4 +310,20 @@ pub fn game_started_ms() -> Option<u64> {
 #[cfg(not(windows))]
 pub fn game_started_ms() -> Option<u64> {
     None
+}
+
+/// Ouvre une page dans le navigateur par défaut, sans lui transmettre les droits administrateur du compagnon :
+/// c'est l'Explorateur de la session qui la lance.
+#[cfg(windows)]
+pub fn open_site(url: &str) {
+    if let Err(e) = std::process::Command::new("explorer").arg(url).spawn() {
+        tracing::error!("unable to open {url}: {e}");
+    }
+}
+
+#[cfg(not(windows))]
+pub fn open_site(url: &str) {
+    if let Err(e) = open::that(url) {
+        tracing::error!("unable to open {url}: {e}");
+    }
 }
