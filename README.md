@@ -5,10 +5,11 @@
 Teyvin Companion is a build of [Irminsul](https://github.com/konkers/irminsul) that shares its exports with
 [Teyvin](https://teyvin.app), a Genshin Impact planner, instead of the clipboard or a file.
 
-Irminsul's capture and export code is used unchanged. Teyvin Companion adds a small HTTP relay that serves the
-latest GOOD export on `127.0.0.1:47317`. The relay only answers requests from the Teyvin website, and nothing is
-sent over the network. Like Irminsul, it needs to run with admin privileges (for the packet capture) and to be
-running when Genshin starts.
+Irminsul's capture and export code is used unchanged, apart from a wider key search so that it also works when the
+game is already running. Teyvin Companion adds a small HTTP relay that serves the latest GOOD export on
+`127.0.0.1:47317`. The relay only answers requests from the Teyvin website, and nothing is sent over the network.
+Like Irminsul, it needs to run with admin privileges (for the packet capture). It reads the account at login: if
+the game is already running when it starts, log out and back in.
 
 ## Features
 
