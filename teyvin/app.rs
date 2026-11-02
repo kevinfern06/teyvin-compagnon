@@ -26,6 +26,7 @@ use crate::{AppState, Message, ReloadHandle, State, TracingLevel, capture, open_
 /// `{v}` est remplacé par la version.
 struct Texts {
     url: &'static str,
+    download_url: &'static str,
     brand: &'static str,
     step_ready: &'static str,
     step_launch: &'static str,
@@ -40,10 +41,6 @@ struct Texts {
     later: &'static str,
     update_available: &'static str,
     update_ready: &'static str,
-    updating: &'static str,
-    will_restart: &'static str,
-    updated: &'static str,
-    restarting: &'static str,
     capture_on: &'static str,
     capture_off: &'static str,
     waiting: &'static str,
@@ -71,6 +68,7 @@ struct Texts {
 
 const FR: Texts = Texts {
     url: "https://teyvin.app/compte",
+    download_url: "https://teyvin.app/compagnon",
     brand: "TEYVIN COMPANION",
     step_ready: "Compagnon prêt",
     step_launch: "Lance le jeu",
@@ -81,14 +79,10 @@ const FR: Texts = Texts {
     starting: "Démarrage…",
     checking_updates: "Vérification des mises à jour du compagnon.",
     loading_data: "Chargement des données du jeu.",
-    update: "Mettre à jour",
+    update: "Télécharger",
     later: "Plus tard",
     update_available: "Mise à jour disponible",
-    update_ready: "La version {v} du compagnon est prête.",
-    updating: "Mise à jour en cours…",
-    will_restart: "Le compagnon redémarrera tout seul.",
-    updated: "Mis à jour",
-    restarting: "Redémarrage du compagnon…",
+    update_ready: "La version {v} du compagnon est sortie. Le bouton ouvre sa page de téléchargement.",
     capture_on: "capture active",
     capture_off: "capture arrêtée",
     waiting: "en attente…",
@@ -116,6 +110,7 @@ const FR: Texts = Texts {
 
 const EN: Texts = Texts {
     url: "https://teyvin.app/en/account",
+    download_url: "https://teyvin.app/en/companion",
     brand: "TEYVIN COMPANION",
     step_ready: "Companion ready",
     step_launch: "Launch the game",
@@ -126,14 +121,10 @@ const EN: Texts = Texts {
     starting: "Starting…",
     checking_updates: "Checking for companion updates.",
     loading_data: "Loading game data.",
-    update: "Update",
+    update: "Download",
     later: "Later",
     update_available: "Update available",
-    update_ready: "Companion version {v} is ready.",
-    updating: "Updating…",
-    will_restart: "The companion will restart on its own.",
-    updated: "Updated",
-    restarting: "Restarting the companion…",
+    update_ready: "Companion version {v} is out. The button opens its download page.",
     capture_on: "capture on",
     capture_off: "capture stopped",
     waiting: "waiting…",
@@ -236,7 +227,6 @@ pub struct IrminsulApp {
     state_rx: watch::Receiver<AppState>,
     saved_state: SavedAppState,
     download_acknowledged: bool,
-    restarting: bool,
 }
 
 /// Même démarrage qu'Irminsul : mises à jour, lien des vœux, moniteur de capture (dans un runtime tokio).
@@ -314,7 +304,6 @@ impl IrminsulApp {
             state_rx,
             saved_state,
             download_acknowledged: false,
-            restarting: false,
         }
     }
 
@@ -322,21 +311,6 @@ impl IrminsulApp {
         if let Err(e) = self.ui_message_tx.send(msg) {
             tracing::error!("Unable to send UI message: {e}");
         }
-    }
-
-    /// Relance le compagnon (après une mise à jour) et ferme cette instance.
-    fn restart(&mut self, ctx: &Context) {
-        if self.restarting {
-            return;
-        }
-        match std::env::current_exe() {
-            Ok(exe) => {
-                let _ = std::process::Command::new(exe).spawn();
-            }
-            Err(e) => tracing::error!("unable to find the executable to restart it: {e}"),
-        }
-        ctx.send_viewport_cmd(ViewportCommand::Close);
-        self.restarting = true;
     }
 }
 
@@ -390,8 +364,6 @@ fn view(state: &AppState) -> View {
             secondary: Some((t.later, Message::UpdateCanceled)),
             ..wait(t.update_available, &t.update_ready.replace("{v}", &version.to_string()))
         },
-        State::Updating => wait(t.updating, t.will_restart),
-        State::Updated { .. } => wait(t.updated, t.restarting),
         State::Main => {
             let u = &state.updated;
             let game = u.items_updated.or(u.characters_updated);
@@ -471,7 +443,6 @@ impl eframe::App for IrminsulApp {
                 self.download_acknowledged = true;
                 self.send(Message::DownloadAcknowledged);
             }
-            State::Updated { .. } => self.restart(ctx),
             _ => {}
         }
         let v = view(&state);
@@ -662,6 +633,9 @@ impl IrminsulApp {
             (Some((label, msg)), secondary) => {
                 let msg = clone_message(msg);
                 if ui.put(second, outline(label)).clicked() {
+                    if matches!(msg, Message::UpdateAcknowledged) {
+                        ui.ctx().open_url(OpenUrl::new_tab(t.download_url));
+                    }
                     self.send(msg);
                 }
                 if let Some((label, msg)) = secondary {
