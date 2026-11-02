@@ -244,3 +244,58 @@ fn respond(
     stream.flush()?;
     Ok(())
 }
+
+/// Heure de lancement du jeu (ms depuis 1970), si le jeu tourne déjà. On demande seulement à Windows l'heure de création
+/// du processus, sans lire le jeu. Le moteur en a besoin pour une reconnexion : voir teyvin/seed_search.rs.
+#[cfg(windows)]
+pub fn game_started_ms() -> Option<u64> {
+    use windows::Win32::Foundation::{CloseHandle, FILETIME};
+    use windows::Win32::System::Diagnostics::ToolHelp::{
+        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
+    };
+    use windows::Win32::System::Threading::{
+        GetProcessTimes, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+    };
+
+    // Le processus existe mais refuse de donner son heure : on cherche alors sur les dernières heures
+    const FALLBACK_MS: u64 = 6 * 3_600_000;
+    // FILETIME : intervalles de 100 ns depuis 1601
+    const FILETIME_TO_UNIX_MS: u64 = 11_644_473_600_000;
+
+    let pid = unsafe {
+        let snapshot = CreateToolhelp32Snapshot(TH32CS_SNAPPROCESS, 0).ok()?;
+        let mut entry = PROCESSENTRY32W { dwSize: size_of::<PROCESSENTRY32W>() as u32, ..Default::default() };
+        let mut pid = None;
+        let mut more = Process32FirstW(snapshot, &mut entry).is_ok();
+        while more {
+            let len = entry.szExeFile.iter().position(|c| *c == 0).unwrap_or(entry.szExeFile.len());
+            let name = String::from_utf16_lossy(&entry.szExeFile[..len]);
+            if name.eq_ignore_ascii_case("GenshinImpact.exe") || name.eq_ignore_ascii_case("YuanShen.exe") {
+                pid = Some(entry.th32ProcessID);
+                break;
+            }
+            more = Process32NextW(snapshot, &mut entry).is_ok();
+        }
+        let _ = CloseHandle(snapshot);
+        pid?
+    };
+
+    let now = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).ok()?.as_millis() as u64;
+    let created = unsafe {
+        OpenProcess(PROCESS_QUERY_LIMITED_INFORMATION, false, pid).ok().and_then(|process| {
+            let (mut created, mut a, mut b, mut c) =
+                (FILETIME::default(), FILETIME::default(), FILETIME::default(), FILETIME::default());
+            let times = GetProcessTimes(process, &mut created, &mut a, &mut b, &mut c);
+            let _ = CloseHandle(process);
+            times.ok().map(|_| created)
+        })
+    };
+    Some(created.map_or(now.saturating_sub(FALLBACK_MS), |t| {
+        (((t.dwHighDateTime as u64) << 32 | t.dwLowDateTime as u64) / 10_000).saturating_sub(FILETIME_TO_UNIX_MS)
+    }))
+}
+
+#[cfg(not(windows))]
+pub fn game_started_ms() -> Option<u64> {
+    None
+}

@@ -118,7 +118,9 @@ jobs:
       # Tests de nos modifications (mise à jour : jamais de retour en arrière) : un échec bloque la release
       - name: Tests Teyvin
         working-directory: irminsul
-        run: cargo test --release teyvin_tests
+        run: |
+          cargo test --release teyvin_tests
+          cargo test --release -p auto-artifactarium teyvin_tests
 
       - name: Release
         env:

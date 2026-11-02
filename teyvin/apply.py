@@ -2,7 +2,8 @@
 
 Usage : python teyvin/apply.py <dossier irminsul> --version 0.2.2-teyvin.1 --repo propriétaire/teyvin-compagnon
 
-Le moteur d'Irminsul (lecture du jeu, mises à jour) reste intact. On ajoute le relais (src/relay.rs), on
+Le moteur d'Irminsul (lecture du jeu, mises à jour) reste intact, sauf la recherche de clé pour un jeu déjà lancé
+(teyvin/seed_search.rs, dans une copie du moteur de capture). On ajoute le relais (src/relay.rs), on
 remplace l'écran (src/app.rs, aux couleurs de Teyvin) et on modifie quelques lignes ailleurs. Chaque point
 d'ancrage doit apparaître exactement une fois ; sinon le script s'arrête avec un message clair (le code
 d'Irminsul a changé : à corriger à la main).
@@ -11,6 +12,7 @@ d'Irminsul a changé : à corriger à la main).
 import argparse
 import re
 import shutil
+import subprocess
 import sys
 from pathlib import Path
 
@@ -182,8 +184,93 @@ const TEYVIN_MANIFEST: &str = r#"<assembly xmlns="urn:schemas-microsoft-com:asm.
 #[tokio::main]\n""",
     )
 
-    # 4. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour
+    # 3 quinquies. Jeu déjà lancé : le moteur ne retrouve pas la clé de session si le compagnon a manqué la première
+    # connexion du jeu (une reconnexion échouait donc). On corrige une copie du moteur de capture, épinglée au même
+    # commit, pour chercher depuis l'heure de lancement du jeu : voir teyvin/seed_search.rs
     cargo = args.irminsul / "Cargo.toml"
+    manifest = cargo.read_bytes().decode("utf-8")
+    found = re.search(r'auto-artifactarium = \{ git = "([^"]+)", rev = "([0-9a-f]+)" \}', manifest)
+    if not found:
+        sys.exit("ERREUR : auto-artifactarium introuvable dans Cargo.toml")
+    engine = args.irminsul / "vendor" / "auto-artifactarium"
+    if not engine.exists():
+        subprocess.run(["git", "clone", "--quiet", found[1], str(engine)], check=True)
+        subprocess.run(["git", "-C", str(engine), "checkout", "--quiet", found[2]], check=True)
+    shutil.copy(HERE / "seed_search.rs", engine / "src" / "seed_search.rs")
+    lib = engine / "src" / "lib.rs"
+    edit(lib, "mod unk_util;\n", f"mod unk_util;\nmod seed_search; {MARK}\n")
+    edit(
+        lib,
+        "    possible_seeds: Vec<u64>,\n}\n",
+        f"    possible_seeds: Vec<u64>,\n    game_started_ms: Option<u64>, {MARK}\n    seed_searched: bool,\n}}\n",
+    )
+    edit(
+        lib,
+        "    #[instrument(skip_all, fields(len = bytes.len()))]\n    pub fn receive_packet(",
+        f"""    /// Heure de lancement du jeu, s'il tournait déjà au démarrage de la capture. {MARK}
+    pub fn set_game_started_ms(&mut self, started: Option<u64>) {{
+        self.game_started_ms = started;
+    }}
+
+    /// Dernier recours quand le moteur n'a pas vu la première connexion du jeu ; une seule fois par connexion. {MARK}
+    fn search_client_seed(&mut self, data: &[u8]) -> bool {{
+        let (Some(started), None, false) = (self.game_started_ms, self.client_seed, self.seed_searched) else {{
+            return false;
+        }};
+        self.seed_searched = true;
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(0, |d| d.as_millis() as i64);
+        let from = (started as i64 - 5_000).max(now - 24 * 3_600_000);
+        let Some((client_seed, key)) = seed_search::search(from, now, &self.possible_seeds, data) else {{
+            warn!("Client seed not found since game start");
+            return false;
+        }};
+        info!("Client seed found since game start");
+        self.client_seed = Some(client_seed);
+        self.key = Some(Key::Session(key));
+        true
+    }}
+
+    #[instrument(skip_all, fields(len = bytes.len()))]
+    pub fn receive_packet(""",
+    )
+    edit(
+        lib,
+        "                self.key = None;\n                Some(GamePacket::Connection(packet))\n",
+        f"                self.key = None;\n                self.seed_searched = false; {MARK}\n                Some(GamePacket::Connection(packet))\n",
+    )
+    edit(
+        lib,
+        "                    match discovered_key {\n",
+        f"""                    if discovered_key.is_none() {{ {MARK}
+                        discovered_key = None; // libère l'emprunt de self.key pour la recherche
+                        if self.search_client_seed(&data) {{
+                            discovered_key = self.key.as_ref();
+                        }}
+                    }}
+
+                    match discovered_key {{
+""",
+    )
+    edit(
+        src / "monitor.rs",
+        "                let cancel_token = CancellationToken::new();\n",
+        f"                self.sniffer.set_game_started_ms(crate::relay::game_started_ms()); {MARK}\n"
+        "                let cancel_token = CancellationToken::new();\n",
+    )
+    edit(
+        cargo,
+        '\t"Win32_System_Console",\n',
+        '\t"Win32_System_Console",\n\t"Win32_System_Diagnostics_ToolHelp",\n\t"Win32_System_Threading",\n',
+    )
+    edit(
+        cargo,
+        '# [patch."https://github.com/konkers/auto-artifactarium"]\n# auto-artifactarium = { path = "../auto-artifactarium" }\n',
+        '[patch."https://github.com/konkers/auto-artifactarium"]\nauto-artifactarium = { path = "vendor/auto-artifactarium" }\n',
+    )
+
+    # 4. Version : celle de la release, pour que la mise à jour automatique sache qu'elle est à jour
     text = cargo.read_bytes().decode("utf-8")
     text, n = re.subn(r'(?m)^version = "[^"]+"', f'version = "{args.version}"', text, count=1)
     if n != 1:
