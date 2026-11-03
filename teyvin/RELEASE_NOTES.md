@@ -4,8 +4,7 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- New look, matching the site: new background, new logo and icon, Teyvin's fonts and colors. The steps now sit in a
-  list on the left.
+- Cleaner, softer background image.
 
 ## Credits
 
