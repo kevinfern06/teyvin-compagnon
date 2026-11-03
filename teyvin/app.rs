@@ -2,9 +2,9 @@
 //!
 //! Remplace l'écran d'Irminsul (src/app.rs) en gardant son moteur : même démarrage (vérification des mises à
 //! jour, lecture du lien de vœux, capture), mêmes messages vers le moniteur. L'écran ne montre que ce qui
-//! sert : une bannière de nuit avec l'état général, quatre étapes (compagnon prêt, jeu connecté, compte lu,
-//! Teyvin à jour), le démarrage avec Windows et un bouton vers Teyvin. En français si Windows l'est, en
-//! anglais sinon.
+//! sert, sur l'illustration du chat : à gauche l'état général, quatre étapes (compagnon prêt, jeu connecté, compte
+//! lu, Teyvin à jour) et un bouton vers Teyvin ; à droite, l'illustration reste dégagée. En français si Windows
+//! l'est, en anglais sinon.
 
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -12,8 +12,8 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use egui::{
-    Align2, Button, Checkbox, Color32, Context, CornerRadius, FontId, Id, PointerButton, Rect,
-    RichText, Sense, Stroke, StrokeKind, Vec2, ViewportCommand, pos2, vec2,
+    Align2, Button, Checkbox, Color32, Context, CornerRadius, FontData, FontFamily, FontId, Id, Painter,
+    PointerButton, Rect, RichText, Sense, Stroke, StrokeKind, Vec2, ViewportCommand, pos2, vec2,
 };
 use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc, watch};
@@ -71,7 +71,7 @@ struct Texts {
 const FR: Texts = Texts {
     url: "https://teyvin.app/compte",
     download_url: "https://teyvin.app/compagnon",
-    brand: "TEYVIN COMPANION",
+    brand: "Compagnon",
     step_ready: "Compagnon prêt",
     step_launch: "Lance le jeu",
     step_game: "Jeu connecté",
@@ -114,7 +114,7 @@ const FR: Texts = Texts {
 const EN: Texts = Texts {
     url: "https://teyvin.app/en/account",
     download_url: "https://teyvin.app/en/companion",
-    brand: "TEYVIN COMPANION",
+    brand: "Companion",
     step_ready: "Companion ready",
     step_launch: "Launch the game",
     step_game: "Game connected",
@@ -181,17 +181,50 @@ fn windows_is_french() -> bool {
     std::env::var("LANG").is_ok_and(|lang| lang.starts_with("fr"))
 }
 
-// Couleurs de Teyvin (DA « Irminsul nuit »)
-const BG: Color32 = Color32::from_rgb(6, 9, 11);
+// Couleurs de Teyvin (DA « Grimoire », tokens de app/globals.css)
+const BG: Color32 = Color32::from_rgb(5, 7, 8);
+const POPOVER: Color32 = Color32::from_rgb(14, 13, 26);
 const INK: Color32 = Color32::from_rgb(233, 239, 241);
-const MUTED: Color32 = Color32::from_rgb(141, 154, 159);
-const TEAL: Color32 = Color32::from_rgb(45, 212, 191);
-const TEAL_LIGHT: Color32 = Color32::from_rgb(153, 246, 228);
-const ON_TEAL: Color32 = Color32::from_rgb(3, 37, 33);
+const MUTED: Color32 = Color32::from_rgb(160, 170, 178);
+const ACCENT: Color32 = Color32::from_rgb(253, 225, 120);
+const ON_ACCENT: Color32 = Color32::from_rgb(58, 44, 0);
+const ORNAMENT: Color32 = Color32::from_rgb(205, 191, 154);
+const OK: Color32 = Color32::from_rgb(74, 222, 128);
 const WARN: Color32 = Color32::from_rgb(251, 154, 108);
 
-const BANNER_HEIGHT: f32 = 250.0;
 const MARGIN: f32 = 22.0;
+/// Colonne de gauche : l'orbe et le chat restent à sa droite.
+const COLUMN: f32 = 372.0;
+const ROW: f32 = 38.0;
+const STEPS_TOP: f32 = 170.0;
+const STEPS_HEIGHT: f32 = 4.0 * ROW + 12.0;
+const BOLD: &str = "rubik-gras";
+const WORDMARK_HEIGHT: f32 = 24.0;
+const WORDMARK_RATIO: f32 = 2.928;
+
+fn bold(size: f32) -> FontId {
+    FontId::new(size, FontFamily::Name(BOLD.into()))
+}
+
+/// Police du texte du site (Rubik, licence OFL) à la place de celle d'egui ; les icônes restent en secours.
+fn install_fonts(ctx: &Context) {
+    let mut fonts = egui::FontDefinitions::default();
+    let icons = egui_material_icons::font_insert();
+    fonts.font_data.insert(icons.name.clone(), icons.data.into());
+    for (name, data) in [
+        ("rubik", &include_bytes!("../assets/teyvin-rubik-regular.ttf")[..]),
+        (BOLD, &include_bytes!("../assets/teyvin-rubik-gras.ttf")[..]),
+    ] {
+        fonts.font_data.insert(name.into(), FontData::from_static(data).into());
+    }
+    let proportional = fonts.families.entry(FontFamily::Proportional).or_default();
+    proportional.insert(0, "rubik".into());
+    proportional.push(icons.name);
+    let mut heavy = vec![BOLD.to_string()];
+    heavy.extend(proportional.iter().cloned());
+    fonts.families.insert(FontFamily::Name(BOLD.into()), heavy);
+    ctx.set_fonts(fonts);
+}
 
 /// Réglages gardés entre deux lancements. Les réglages d'export restent ceux d'Irminsul par défaut :
 /// le relais les reprend pour produire l'export lu par Teyvin.
@@ -324,7 +357,8 @@ impl IrminsulApp {
         capture_backend: capture::BackendType,
     ) -> Self {
         egui_extras::install_image_loaders(&cc.egui_ctx);
-        egui_material_icons::initialize(&cc.egui_ctx);
+        install_fonts(&cc.egui_ctx);
+        cc.egui_ctx.set_theme(egui::Theme::Dark);
 
         let saved_state: SavedAppState = cc
             .storage
@@ -354,7 +388,7 @@ impl IrminsulApp {
     }
 }
 
-/// Une étape : faite, en cours (orange) ou à venir (grisée).
+/// Une étape : faite, en cours (jaune) ou à venir (grisée).
 #[derive(Clone, Copy, PartialEq)]
 enum Step {
     Done,
@@ -441,7 +475,7 @@ fn view(state: &AppState) -> View {
             let (title, subtitle, warn, action) = if !state.capturing {
                 (t.capture_stopped, t.capture_stopped_hint, true, Some((t.start_capture, Message::StartCapture)))
             } else if game.is_none() {
-                (t.waiting_game, t.waiting_game_hint, true, None)
+                (t.waiting_game, t.waiting_game_hint, false, None)
             } else if !read {
                 (t.reading, t.reading_hint, false, None)
             } else if !teyvin {
@@ -475,6 +509,9 @@ impl eframe::App for IrminsulApp {
         ctx.style_mut(|style| {
             style.interaction.selectable_labels = false;
             style.visuals.override_text_color = Some(INK);
+            style.visuals.widgets.inactive.fg_stroke.color = ACCENT;
+            style.visuals.widgets.hovered.fg_stroke.color = ACCENT;
+            style.visuals.widgets.active.fg_stroke.color = ACCENT;
         });
 
         let state = self.state_rx.borrow_and_update().clone();
@@ -491,8 +528,9 @@ impl eframe::App for IrminsulApp {
             .frame(egui::Frame::NONE.fill(BG))
             .show(ctx, |ui| {
                 let full = ui.max_rect();
-                self.banner(ui, full, &v);
+                self.backdrop(ui, full);
                 self.title_bar(ui, full);
+                self.header(ui, full, &v);
                 self.steps(ui, full, &v);
                 self.footer(ui, full, &v);
             });
@@ -500,80 +538,53 @@ impl eframe::App for IrminsulApp {
 }
 
 impl IrminsulApp {
-    /// Paysage de nuit de Teyvin, fondu vers le fond, avec l'état général en grand.
-    fn banner(&self, ui: &mut egui::Ui, full: Rect, v: &View) {
-        let rect = Rect::from_min_size(full.min, vec2(full.width(), BANNER_HEIGHT));
-        // Image 16:9 recadrée en bandeau (on garde la lune et le château)
-        let visible = (rect.height() / rect.width()) / (810.0 / 1440.0);
-        egui::Image::new(egui::include_image!("../assets/teyvin-nuit.webp"))
-            .uv(Rect::from_min_max(pos2(0.0, 0.1), pos2(1.0, 0.1 + visible)))
-            .tint(if v.warn { Color32::from_gray(150) } else { Color32::WHITE })
-            .paint_at(ui, rect);
-
-        // Fondu vers le fond, par bandes
+    /// Illustration du chat sur toute la fenêtre, assombrie à gauche pour la lisibilité.
+    fn backdrop(&self, ui: &mut egui::Ui, full: Rect) {
+        egui::Image::new(egui::include_image!("../assets/teyvin-fond.webp")).paint_at(ui, full);
         let painter = ui.painter();
-        let bands = 40;
-        for i in 0..bands {
-            let t = i as f32 / bands as f32;
-            let y0 = rect.top() + rect.height() * (0.35 + 0.65 * t);
-            let y1 = rect.top() + rect.height() * (0.35 + 0.65 * (t + 1.0 / bands as f32));
-            let alpha = (t * t * 255.0) as u8;
-            painter.rect_filled(
-                Rect::from_x_y_ranges(rect.x_range(), y0..=y1 + 1.0),
-                0.0,
-                Color32::from_rgba_unmultiplied(BG.r(), BG.g(), BG.b(), alpha),
-            );
-        }
+        let split = full.left() + MARGIN + COLUMN;
+        let fade = split + 70.0;
+        shade(painter, Rect::from_x_y_ranges(full.left()..=split, full.y_range()), [0.74, 0.6]);
+        shade(painter, Rect::from_x_y_ranges(split..=fade, full.y_range()), [0.6, 0.0]);
+    }
 
-        // Voile sombre derrière le texte (en bas à gauche), pour la lisibilité : dégradé de gauche à droite et du
-        // haut vers le bas, le paysage reste visible ailleurs
-        let xs = [(rect.left(), 1.0), (rect.left() + rect.width() * 0.35, 0.85), (rect.left() + rect.width() * 0.7, 0.0)];
-        let ys = [(rect.top() + rect.height() * 0.38, 0.0), (rect.top() + rect.height() * 0.62, 1.0), (rect.bottom(), 1.0)];
-        let mut veil = egui::Mesh::default();
-        for (y, ay) in ys {
-            for (x, ax) in xs {
-                let alpha = (0.8 * ax * ay * 255.0) as u8;
-                veil.colored_vertex(pos2(x, y), Color32::from_rgba_unmultiplied(BG.r(), BG.g(), BG.b(), alpha));
-            }
-        }
-        for row in 0..2 {
-            for col in 0..2 {
-                let i = row * 3 + col;
-                veil.add_triangle(i, i + 1, i + 3);
-                veil.add_triangle(i + 1, i + 4, i + 3);
-            }
-        }
-        painter.add(veil);
+    /// Logo et état général, en haut de la colonne.
+    fn header(&self, ui: &mut egui::Ui, full: Rect, v: &View) {
+        let x = full.left() + MARGIN;
+        let top = full.top() + 16.0;
+        egui::Image::new(egui::include_image!("../assets/teyvin-logo.webp"))
+            .paint_at(ui, Rect::from_min_size(pos2(x, top), Vec2::splat(36.0)));
+        let wordmark = Rect::from_min_size(pos2(x + 44.0, top + 7.0), vec2(WORDMARK_HEIGHT * WORDMARK_RATIO, WORDMARK_HEIGHT));
+        egui::Image::new(egui::include_image!("../assets/teyvin-wordmark.webp")).paint_at(ui, wordmark);
 
-        let x = rect.left() + MARGIN;
-        let y = rect.bottom() - MARGIN;
+        let painter = ui.painter();
         painter.text(
-            pos2(x, y - 62.0),
+            pos2(wordmark.right() + 10.0, wordmark.bottom() - 2.0),
             Align2::LEFT_BOTTOM,
             tx().brand,
-            FontId::proportional(11.0),
-            TEAL_LIGHT,
+            FontId::proportional(13.0),
+            ORNAMENT,
         );
-        let title = painter.text(pos2(x, y - 26.0), Align2::LEFT_BOTTOM, &v.title, FontId::proportional(30.0), INK);
+        let title = painter.text(pos2(x, top + 52.0), Align2::LEFT_TOP, &v.title, bold(27.0), INK);
         if v.check {
             painter.text(
                 pos2(title.right() + 10.0, title.center().y),
                 Align2::LEFT_CENTER,
                 egui_material_icons::icons::ICON_CHECK_CIRCLE,
-                FontId::proportional(26.0),
-                TEAL,
+                FontId::proportional(23.0),
+                OK,
             );
         }
-        painter.text(
-            pos2(x, y),
-            Align2::LEFT_BOTTOM,
-            &v.subtitle,
-            FontId::proportional(14.0),
-            if v.warn { WARN } else { MUTED },
+        let subtitle = painter.layout(
+            v.subtitle.clone(),
+            FontId::proportional(13.5),
+            if v.warn { WARN } else { INK.gamma_multiply(0.88) },
+            COLUMN,
         );
+        painter.galley(pos2(x, title.bottom() + 5.0), subtitle, INK);
         if v.spinner {
-            let r = Rect::from_center_size(pos2(rect.right() - MARGIN - 10.0, y - 10.0), Vec2::splat(20.0));
-            ui.put(r, egui::Spinner::new().color(TEAL));
+            let r = Rect::from_center_size(pos2(x + COLUMN - 10.0, title.center().y), Vec2::splat(20.0));
+            ui.put(r, egui::Spinner::new().color(ACCENT));
         }
     }
 
@@ -587,7 +598,13 @@ impl IrminsulApp {
         if response.drag_started_by(PointerButton::Primary) {
             ui.ctx().send_viewport_cmd(ViewportCommand::StartDrag);
         }
-        let icon = |text: &str| Button::new(RichText::new(text).size(20.0).color(INK)).frame(false);
+        // Sur fond sombre : le haut de l'illustration est très clair par endroits
+        let icon = |text: &str| {
+            Button::new(RichText::new(text).size(20.0).color(INK))
+                .fill(Color32::from_rgba_unmultiplied(POPOVER.r(), POPOVER.g(), POPOVER.b(), 150))
+                .stroke(Stroke::NONE)
+                .corner_radius(10)
+        };
         if ui.put(minimize, icon(egui_material_icons::icons::ICON_REMOVE)).clicked() {
             ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
         }
@@ -596,83 +613,88 @@ impl IrminsulApp {
         }
     }
 
-    /// Les quatre étapes, en cartes côte à côte.
+    /// Les quatre étapes, l'une sous l'autre et reliées par un fil, dans un panneau.
     fn steps(&self, ui: &mut egui::Ui, full: Rect, v: &View) {
-        let gap = 10.0;
-        let top = full.top() + BANNER_HEIGHT + 4.0;
-        let width = (full.width() - 2.0 * MARGIN - 3.0 * gap) / 4.0;
+        let panel = Rect::from_min_size(pos2(full.left() + MARGIN, full.top() + STEPS_TOP), vec2(COLUMN, STEPS_HEIGHT));
         let painter = ui.painter();
-        for (i, (step, label, detail)) in v.steps.iter().enumerate() {
-            let rect = Rect::from_min_size(pos2(full.left() + MARGIN + i as f32 * (width + gap), top), vec2(width, 92.0));
-            let (fill, border) = match step {
-                Step::Done if i == 3 => (Color32::from_rgba_unmultiplied(45, 212, 191, 20), TEAL.gamma_multiply(0.5)),
-                Step::Current => (Color32::from_rgba_unmultiplied(255, 255, 255, 10), WARN.gamma_multiply(0.5)),
-                _ => (Color32::from_rgba_unmultiplied(255, 255, 255, 10), Color32::from_rgba_unmultiplied(255, 255, 255, 22)),
-            };
-            painter.rect_filled(rect, CornerRadius::same(12), fill);
-            painter.rect_stroke(rect, CornerRadius::same(12), Stroke::new(1.0_f32, border), StrokeKind::Inside);
+        painter.rect_filled(panel, CornerRadius::same(14), POPOVER.gamma_multiply(0.82));
+        painter.rect_stroke(panel, CornerRadius::same(14), Stroke::new(1.0_f32, ORNAMENT.gamma_multiply(0.22)), StrokeKind::Inside);
 
-            let dim = *step == Step::Todo;
-            let center = pos2(rect.left() + 24.0, rect.top() + 24.0);
+        let center = |i: usize| pos2(panel.left() + 26.0, panel.top() + 6.0 + ROW * (i as f32 + 0.5));
+        for i in 0..v.steps.len() - 1 {
+            let (from, to) = (center(i), center(i + 1));
+            let color = if v.steps[i].0 == Step::Done { OK.gamma_multiply(0.45) } else { ORNAMENT.gamma_multiply(0.22) };
+            painter.line_segment([pos2(from.x, from.y + 11.0), pos2(to.x, to.y - 11.0)], Stroke::new(1.0_f32, color));
+        }
+        for (i, (step, label, detail)) in v.steps.iter().enumerate() {
+            let center = center(i);
             match step {
                 Step::Done => {
-                    painter.circle_filled(center, 11.0, TEAL);
-                    painter.text(center, Align2::CENTER_CENTER, egui_material_icons::icons::ICON_CHECK, FontId::proportional(15.0), ON_TEAL);
+                    painter.circle_filled(center, 10.0, OK);
+                    painter.text(center, Align2::CENTER_CENTER, egui_material_icons::icons::ICON_CHECK, FontId::proportional(14.0), BG);
                 }
                 Step::Current => {
-                    painter.circle_stroke(center, 10.0, Stroke::new(2.0_f32, WARN));
-                    painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(12.0), WARN);
+                    painter.circle_stroke(center, 9.5, Stroke::new(2.0_f32, ACCENT));
+                    painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), bold(11.5), ACCENT);
                 }
                 Step::Todo => {
-                    painter.circle_stroke(center, 10.0, Stroke::new(1.0_f32, MUTED.gamma_multiply(0.6)));
-                    painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(12.0), MUTED);
+                    painter.circle_stroke(center, 9.5, Stroke::new(1.0_f32, MUTED.gamma_multiply(0.6)));
+                    painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), FontId::proportional(11.5), MUTED);
                 }
             }
-            let title_color = match step {
-                Step::Done if i == 3 => TEAL,
-                Step::Current => WARN,
-                Step::Todo => MUTED,
-                Step::Done => INK,
+            let (font, color) = match step {
+                Step::Done => (bold(13.5), INK),
+                Step::Current => (bold(13.5), ACCENT),
+                Step::Todo => (FontId::proportional(13.5), MUTED),
             };
-            painter.text(pos2(rect.left() + 14.0, rect.top() + 50.0), Align2::LEFT_TOP, *label, FontId::proportional(14.0), title_color);
+            painter.text(pos2(center.x + 22.0, center.y), Align2::LEFT_CENTER, *label, font, color);
             painter.text(
-                pos2(rect.left() + 14.0, rect.top() + 70.0),
-                Align2::LEFT_TOP,
+                pos2(panel.right() - 14.0, center.y),
+                Align2::RIGHT_CENTER,
                 detail,
-                FontId::proportional(12.0),
-                if dim { MUTED.gamma_multiply(0.6) } else { MUTED },
+                FontId::proportional(11.5),
+                if *step == Step::Todo { MUTED.gamma_multiply(0.7) } else { MUTED },
             );
         }
     }
 
-    /// Action du moment, ouvrir Teyvin ; version et journaux tout en bas.
+    /// Boutons sous les étapes (un seul en jaune : l'action attendue), version et journaux tout en bas.
     fn footer(&mut self, ui: &mut egui::Ui, full: Rect, v: &View) {
         let t = tx();
-        let y =full.top() + BANNER_HEIGHT + 4.0 + 92.0 + 22.0;
-        let h = 34.0;
+        let x = full.left() + MARGIN;
+        let y = full.top() + STEPS_TOP + STEPS_HEIGHT + 14.0;
+        let h = 36.0;
+        let gap = 10.0;
 
-        let open = Rect::from_min_size(pos2(full.right() - MARGIN - 170.0, y), vec2(170.0, h));
+        let primary = |text: String| {
+            Button::new(RichText::new(text).color(ON_ACCENT).family(FontFamily::Name(BOLD.into())).size(14.0))
+                .fill(ACCENT)
+                .corner_radius(10)
+        };
+        let outline = |text: String| {
+            Button::new(RichText::new(text).color(INK).size(14.0))
+                .fill(POPOVER.gamma_multiply(0.7))
+                .stroke(Stroke::new(1.0_f32, ORNAMENT.gamma_multiply(0.35)))
+                .corner_radius(10)
+        };
+
+        // Trois boutons quand une mise à jour attend une réponse
+        let (open_width, second_width) = if v.secondary.is_some() { (152.0, 120.0) } else { (190.0, COLUMN - 190.0 - gap) };
+        let open = Rect::from_min_size(pos2(x, y), vec2(open_width, h));
+        let second = Rect::from_min_size(pos2(open.right() + gap, y), vec2(second_width, h));
+        let third = Rect::from_min_max(pos2(second.right() + gap, y), pos2(x + COLUMN, y + h));
+
         let open_label = format!("{}  {}", t.open_teyvin, egui_material_icons::icons::ICON_OPEN_IN_NEW);
-        let open_button = Button::new(RichText::new(open_label).color(ON_TEAL).strong().size(14.0))
-            .fill(TEAL)
-            .corner_radius(8);
+        let open_button = if v.action.is_some() { outline(open_label) } else { primary(open_label) };
         if ui.put(open, open_button).clicked() {
             crate::relay::open_site(t.url);
         }
 
         // Action du moment (mettre à jour, démarrer la capture), sinon « Réduire »
-        let second = Rect::from_min_size(pos2(open.left() - 10.0 - 170.0, y), vec2(170.0, h));
-        let third = Rect::from_min_size(pos2(second.left() - 10.0 - 120.0, y), vec2(120.0, h));
-        let outline = |text: &str| {
-            Button::new(RichText::new(text).color(INK).size(14.0))
-                .fill(Color32::TRANSPARENT)
-                .stroke(Stroke::new(1.0_f32, Color32::from_rgba_unmultiplied(255, 255, 255, 40)))
-                .corner_radius(8)
-        };
         match (&v.action, &v.secondary) {
             (Some((label, msg)), secondary) => {
                 let msg = clone_message(msg);
-                if ui.put(second, outline(label)).clicked() {
+                if ui.put(second, primary((*label).to_string())).clicked() {
                     if matches!(msg, Message::UpdateAcknowledged) {
                         crate::relay::open_site(t.download_url);
                     }
@@ -680,13 +702,13 @@ impl IrminsulApp {
                 }
                 if let Some((label, msg)) = secondary {
                     let msg = clone_message(msg);
-                    if ui.put(third, outline(label)).clicked() {
+                    if ui.put(third, outline((*label).to_string())).clicked() {
                         self.send(msg);
                     }
                 }
             }
             (None, _) => {
-                if ui.put(second, outline(t.minimize)).clicked() {
+                if ui.put(second, outline(t.minimize.to_string())).clicked() {
                     ui.ctx().send_viewport_cmd(ViewportCommand::Minimized(true));
                 }
             }
@@ -694,33 +716,49 @@ impl IrminsulApp {
 
         // Réglage de l'ouverture automatique, sauf si une action prend la place
         if v.secondary.is_none() {
-            let room = Rect::from_min_max(pos2(full.left() + MARGIN, y), pos2(second.left() - 10.0, y + h));
-            let label = RichText::new(t.auto_open).size(12.5).color(MUTED);
-            if ui.put(room, Checkbox::new(&mut self.saved_state.auto_open, label)).changed() {
-                AUTO_OPEN.store(self.saved_state.auto_open, Ordering::Relaxed);
-            }
+            let room = Rect::from_min_max(pos2(x, y + h + 10.0), pos2(x + COLUMN, y + h + 32.0));
+            let label = RichText::new(t.auto_open).size(12.5).color(INK.gamma_multiply(0.85));
+            ui.scope_builder(egui::UiBuilder::new().max_rect(room), |ui| {
+                if ui.add(Checkbox::new(&mut self.saved_state.auto_open, label)).changed() {
+                    AUTO_OPEN.store(self.saved_state.auto_open, Ordering::Relaxed);
+                }
+            });
         }
 
-        // Pied : version, journaux, crédit
+        // Pied : version, crédit, journaux
         let painter = ui.painter();
-        let bottom = full.bottom() - 14.0;
+        let bottom = full.bottom() - 12.0;
         painter.text(
-            pos2(full.left() + MARGIN, bottom),
+            pos2(x, bottom),
             Align2::LEFT_BOTTOM,
             t.credit.replace("{v}", env!("CARGO_PKG_VERSION")),
             FontId::proportional(11.0),
-            MUTED.gamma_multiply(0.8),
+            MUTED,
         );
-        let logs = Rect::from_min_size(pos2(full.right() - MARGIN - 70.0, bottom - 16.0), vec2(70.0, 18.0));
-        if ui
-            .put(logs, Button::new(RichText::new(t.logs).size(11.0).color(MUTED)).frame(false))
-            .clicked()
-        {
-            if let Err(e) = open_log_dir() {
-                tracing::error!("unable to open log dir: {e}");
+        let logs = Rect::from_min_size(pos2(x + COLUMN - 70.0, bottom - 17.0), vec2(70.0, 18.0));
+        let layout = egui::Layout::right_to_left(egui::Align::Center);
+        ui.scope_builder(egui::UiBuilder::new().max_rect(logs).layout(layout), |ui| {
+            ui.spacing_mut().button_padding = Vec2::ZERO;
+            if ui.add(Button::new(RichText::new(t.logs).size(11.0).color(MUTED)).frame(false)).clicked() {
+                if let Err(e) = open_log_dir() {
+                    tracing::error!("unable to open log dir: {e}");
+                }
             }
-        }
+        });
     }
+}
+
+/// Voile sombre de gauche à droite (opacité de chaque bord).
+fn shade(painter: &Painter, rect: Rect, alpha: [f32; 2]) {
+    let color = |a: f32| Color32::from_rgba_unmultiplied(BG.r(), BG.g(), BG.b(), (a * 255.0) as u8);
+    let mut veil = egui::Mesh::default();
+    veil.colored_vertex(rect.left_top(), color(alpha[0]));
+    veil.colored_vertex(rect.right_top(), color(alpha[1]));
+    veil.colored_vertex(rect.right_bottom(), color(alpha[1]));
+    veil.colored_vertex(rect.left_bottom(), color(alpha[0]));
+    veil.add_triangle(0, 1, 2);
+    veil.add_triangle(0, 2, 3);
+    painter.add(veil);
 }
 
 /// Les messages d'Irminsul ne sont pas clonables : on recrée ceux que l'écran envoie.

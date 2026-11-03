@@ -53,7 +53,8 @@ def main() -> None:
     print("  ajouté : relay.rs")
     # Écran du compagnon, aux couleurs de Teyvin (il lance aussi le relais avec le lien des vœux)
     shutil.copy(HERE / "app.rs", src / "app.rs")
-    shutil.copy(HERE / "nuit.webp", args.irminsul / "assets" / "teyvin-nuit.webp")
+    for asset in ("fond.webp", "logo.webp", "wordmark.webp", "rubik-regular.ttf", "rubik-gras.ttf"):
+        shutil.copy(HERE / asset, args.irminsul / "assets" / f"teyvin-{asset}")
     print("  remplacé : app.rs (écran Teyvin)")
     # Logo de Teyvin : icône du .exe (build.rs) et de la fenêtre (main.rs), aux mêmes chemins qu'Irminsul
     shutil.copy(HERE / "icon.ico", args.irminsul / "assets" / "icon.ico")

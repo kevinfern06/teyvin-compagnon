@@ -4,13 +4,8 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- Teyvin opens on its own when the game starts, and its page updates as soon as your account is read. You can turn
-  this off.
-- Updates are now your call: the companion tells you when a new version is out and opens its download page. It no
-  longer replaces itself.
-- The game can already be running: log out and back in from the Paimon menu, no need to close it.
-- The window no longer jumps in size when dragged between screens with different display scales.
-- The "Start with Windows" option is gone.
+- New look, matching the site: new background, new logo and icon, Teyvin's fonts and colors. The steps now sit in a
+  list on the left.
 
 ## Credits
 
