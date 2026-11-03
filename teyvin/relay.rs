@@ -80,9 +80,10 @@ pub fn has_wish_url() -> bool {
 }
 
 /// Enregistre le dernier export GOOD (appelé à chaque nouvelle donnée du jeu).
-pub fn publish(good: anyhow::Result<String>) {
+pub fn publish(good: anyhow::Result<String>, first_character: Option<u32>) {
     match good {
         Ok(good) => {
+            let good = with_first_character(good, first_character);
             let updated_at = now_ms();
             if let Ok(mut latest) = LATEST.lock() {
                 *latest = Some(Snapshot { good, updated_at });
@@ -90,6 +91,21 @@ pub fn publish(good: anyhow::Result<String>) {
         }
         Err(e) => tracing::warn!("Teyvin : export impossible : {e}"),
     }
+}
+
+/// Ajoute à l'export la date d'obtention du premier perso (en secondes), lue par Teyvin pour l'âge du compte.
+fn with_first_character(good: String, first_character: Option<u32>) -> String {
+    let Some(time) = first_character else {
+        return good;
+    };
+    let Ok(mut value) = serde_json::from_str::<serde_json::Value>(&good) else {
+        return good;
+    };
+    let Some(object) = value.as_object_mut() else {
+        return good;
+    };
+    object.insert("teyvinFirstCharacter".into(), time.into());
+    value.to_string()
 }
 
 /// Lance le serveur local dans son propre fil (sans dépendre du runtime tokio d'Irminsul).

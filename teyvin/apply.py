@@ -19,7 +19,7 @@ from pathlib import Path
 HERE = Path(__file__).resolve().parent
 MARK = "// Teyvin Compagnon"
 NAME = "Teyvin Companion"
-FILE = "TeyvinCompanion.exe"
+FILE = "Teyvin.exe"
 
 
 def edit(path: Path, anchor: str, replacement: str) -> None:
@@ -71,7 +71,24 @@ def main() -> None:
         anchor,
         anchor
         + "            crate::relay::publish(self.player_data.export_genshin_optimizer("
-        + f"&crate::relay::export_settings())); {MARK}\n",
+        + f"&crate::relay::export_settings()), self.player_data.first_character_time()); {MARK}\n",
+    )
+    # Date d'obtention du premier perso (le Voyageur) : à peu près la création du compte, pour son âge sur Teyvin
+    anchor = "    pub fn export_genshin_optimizer(&self, settings: &ExportSettings) -> Result<String> {\n"
+    edit(
+        src / "player_data.rs",
+        anchor,
+        f"""    {MARK}
+    pub fn first_character_time(&self) -> Option<u32> {{
+        self.characters
+            .iter()
+            .filter(|c| c.avatar_type == 1 && c.born_time > 0)
+            .map(|c| c.born_time)
+            .min()
+    }}
+
+"""
+        + anchor,
     )
 
     # 3. Mises à jour : le compagnon signale une nouvelle version sans jamais se remplacer lui-même (un .exe qui se

@@ -4,7 +4,8 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- Cleaner, softer background image.
+- Shares the date of the account's first character with Teyvin, to show the account's age.
+- The download is now named `Teyvin.exe`.
 
 ## Credits
 
