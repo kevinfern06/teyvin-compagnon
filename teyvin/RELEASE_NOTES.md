@@ -4,7 +4,7 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- New desktop icon.
+- Simpler logo in the window.
 
 ## Credits
 
