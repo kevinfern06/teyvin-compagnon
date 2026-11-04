@@ -4,8 +4,7 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- One-click updates: when a new version is out, the "Update" button downloads it, checks it and restarts the
-  companion. Nothing happens without that click, and the download page opens if the update fails.
+- New icon and new logo in the window: the Teyvin cat.
 
 ## Credits
 
