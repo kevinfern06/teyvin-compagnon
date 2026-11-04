@@ -4,7 +4,10 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- Simpler logo in the window.
+- Works with game version 7.2. The account data is now recognized by its structure, so a new game version should no
+  longer stop the companion. Characters and items added in 7.2 are skipped until Irminsul updates its game data.
+- If the local port is still busy at startup, for example right after closing an older version, the relay now waits for
+  it instead of giving up.
 
 ## Credits
 

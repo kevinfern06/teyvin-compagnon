@@ -108,17 +108,28 @@ fn with_first_character(good: String, first_character: Option<u32>) -> String {
     value.to_string()
 }
 
+/// Ouvre le port dès qu'il est libre. Une version précédente du compagnon peut le tenir encore (en train de se fermer,
+/// ou restée ouverte) : sans nouvel essai, le compte serait lu mais jamais transmis à Teyvin.
+fn bind_when_free(port: u16, delay: Duration) -> TcpListener {
+    let mut warned = false;
+    loop {
+        match TcpListener::bind(("127.0.0.1", port)) {
+            Ok(listener) => return listener,
+            Err(e) if !warned => {
+                tracing::warn!("Teyvin : port {port} occupé, nouvel essai jusqu'à sa libération : {e}");
+                warned = true;
+            }
+            Err(_) => {}
+        }
+        thread::sleep(delay);
+    }
+}
+
 /// Lance le serveur local dans son propre fil (sans dépendre du runtime tokio d'Irminsul).
 pub fn start(wish_url_rx: watch::Receiver<Option<String>>) {
     let _ = WISH.set(wish_url_rx);
     thread::spawn(|| {
-        let listener = match TcpListener::bind(("127.0.0.1", PORT)) {
-            Ok(listener) => listener,
-            Err(e) => {
-                tracing::warn!("Teyvin : relais indisponible sur le port {PORT} : {e}");
-                return;
-            }
-        };
+        let listener = bind_when_free(PORT, Duration::from_secs(2));
         tracing::info!("Teyvin : relais à l'écoute sur 127.0.0.1:{PORT}");
         for stream in listener.incoming().flatten() {
             thread::spawn(move || {
@@ -341,5 +352,21 @@ pub fn open_site(url: &str) {
 pub fn open_site(url: &str) {
     if let Err(e) = open::that(url) {
         tracing::error!("unable to open {url}: {e}");
+    }
+}
+
+#[cfg(test)]
+mod teyvin_tests {
+    use super::*;
+
+    #[test]
+    fn waits_for_the_port_to_be_free() {
+        let holder = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        let port = holder.local_addr().unwrap().port();
+        let waiting = thread::spawn(move || bind_when_free(port, Duration::from_millis(10)));
+        thread::sleep(Duration::from_millis(100));
+        assert!(!waiting.is_finished(), "le port est encore tenu");
+        drop(holder);
+        assert_eq!(waiting.join().unwrap().local_addr().unwrap().port(), port);
     }
 }

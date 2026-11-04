@@ -3,7 +3,8 @@
 Usage : python teyvin/apply.py <dossier irminsul> --version 0.2.2-teyvin.1 --repo propriétaire/teyvin-compagnon
 
 Le moteur d'Irminsul (lecture du jeu) reste intact, sauf la recherche de clé pour un jeu déjà lancé
-(teyvin/seed_search.rs, dans une copie du moteur de capture). On ajoute le relais (src/relay.rs), on
+(teyvin/seed_search.rs) et la reconnaissance des paquets du compte à chaque version (teyvin/packet_match.rs), dans une
+copie du moteur de capture. On ajoute le relais (src/relay.rs), on
 remplace l'écran (src/app.rs, aux couleurs de Teyvin) et les mises à jour (src/update.rs), et on modifie quelques lignes ailleurs. Chaque point
 d'ancrage doit apparaître exactement une fois ; sinon le script s'arrête avec un message clair (le code
 d'Irminsul a changé : à corriger à la main).
@@ -164,8 +165,23 @@ const TEYVIN_MANIFEST: &str = r#"<assembly xmlns="urn:schemas-microsoft-com:asm.
         subprocess.run(["git", "clone", "--quiet", found[1], str(engine)], check=True)
         subprocess.run(["git", "-C", str(engine), "checkout", "--quiet", found[2]], check=True)
     shutil.copy(HERE / "seed_search.rs", engine / "src" / "seed_search.rs")
+    shutil.copy(HERE / "packet_match.rs", engine / "src" / "packet_match.rs")
     lib = engine / "src" / "lib.rs"
-    edit(lib, "mod unk_util;\n", f"mod unk_util;\nmod seed_search; {MARK}\n")
+    edit(lib, "mod unk_util;\n", f"mod unk_util;\nmod packet_match; {MARK}\nmod seed_search; {MARK}\n")
+    # 3 sexies. Nouvelle version du jeu : le moteur a en dur les numéros des paquets du compte, qui changent à chaque
+    # version. On les reconnaît à leur forme : voir teyvin/packet_match.rs
+    edit(
+        lib,
+        "    if !game_command.is_player_store_notify() {\n        return None;\n    }\n\n"
+        "    return matches_items_all_data_notify(&game_command.proto_data);\n",
+        f"    packet_match::items(game_command.command_id, &game_command.proto_data) {MARK}\n",
+    )
+    edit(
+        lib,
+        "    if !game_command.is_avatar_data_notify() {\n        return None;\n    }\n\n"
+        "    return matches_avatars_all_data_notify(&game_command.proto_data);\n",
+        f"    packet_match::avatars(game_command.command_id, &game_command.proto_data) {MARK}\n",
+    )
     edit(
         lib,
         "    possible_seeds: Vec<u64>,\n}\n",
