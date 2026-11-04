@@ -340,7 +340,8 @@ pub fn game_started_ms() -> Option<u64> {
 }
 
 /// Ouvre une page dans le navigateur par défaut, sans lui transmettre les droits administrateur du compagnon :
-/// c'est l'Explorateur de la session qui la lance.
+/// c'est l'Explorateur de la session qui la lance. L'adresse ne doit pas contenir de « = » : il ouvrirait alors le
+/// dossier Documents.
 #[cfg(windows)]
 pub fn open_site(url: &str) {
     if let Err(e) = std::process::Command::new("explorer").arg(url).spawn() {

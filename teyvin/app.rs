@@ -77,7 +77,7 @@ struct Texts {
 
 const FR: Texts = Texts {
     // ?compagnon=1 : le site sait que le compagnon est là et s'y connecte sans réglage
-    url: "https://teyvin.app/compte?compagnon=1",
+    url: "https://teyvin.app/compte?compagnon",
     download_url: "https://teyvin.app/compagnon",
     brand: "Compagnon",
     step_ready: "Compagnon prêt",
@@ -127,7 +127,7 @@ const FR: Texts = Texts {
 };
 
 const EN: Texts = Texts {
-    url: "https://teyvin.app/en/account?compagnon=1",
+    url: "https://teyvin.app/en/account?compagnon",
     download_url: "https://teyvin.app/en/companion",
     brand: "Companion",
     step_ready: "Companion ready",
@@ -848,6 +848,15 @@ mod teyvin_tests {
         assert_eq!(current(&main_view(true, true, true, false, false)), [4]);
         assert_eq!(current(&main_view(true, true, true, false, true)), [4]);
         assert!(current(&main_view(true, true, true, true, true)).is_empty());
+    }
+
+    #[test]
+    fn site_addresses_have_no_equals_sign() {
+        // L'Explorateur ouvre le dossier Documents au lieu de la page si l'adresse contient un « = » (voir open_site)
+        for t in [&FR, &EN] {
+            assert!(!t.url.contains('='), "{}", t.url);
+            assert!(!t.download_url.contains('='), "{}", t.download_url);
+        }
     }
 
     #[test]
