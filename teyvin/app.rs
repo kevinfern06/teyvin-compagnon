@@ -34,6 +34,7 @@ struct Texts {
     step_game: &'static str,
     step_read: &'static str,
     step_teyvin: &'static str,
+    step_of: &'static str,
     starting_detail: &'static str,
     starting: &'static str,
     checking_updates: &'static str,
@@ -58,6 +59,10 @@ struct Texts {
     waiting_game_hint: &'static str,
     reading: &'static str,
     reading_hint: &'static str,
+    open_title: &'static str,
+    open_hint: &'static str,
+    open_detail: &'static str,
+    updating: &'static str,
     read_hint: &'static str,
     all_done: &'static str,
     all_done_hint: &'static str,
@@ -69,7 +74,8 @@ struct Texts {
 }
 
 const FR: Texts = Texts {
-    url: "https://teyvin.app/compte",
+    // ?compagnon=1 : le site sait que le compagnon est là et s'y connecte sans réglage
+    url: "https://teyvin.app/compte?compagnon=1",
     download_url: "https://teyvin.app/compagnon",
     brand: "Compagnon",
     step_ready: "Compagnon prêt",
@@ -77,6 +83,7 @@ const FR: Texts = Texts {
     step_game: "Jeu connecté",
     step_read: "Compte lu",
     step_teyvin: "Teyvin à jour",
+    step_of: "ÉTAPE {n} SUR 4",
     starting_detail: "démarrage…",
     starting: "Démarrage…",
     checking_updates: "Vérification des mises à jour du compagnon.",
@@ -97,11 +104,15 @@ const FR: Texts = Texts {
     capture_stopped: "Capture arrêtée",
     capture_stopped_hint: "Relance la capture pour que le compagnon lise ton compte.",
     start_capture: "Démarrer la capture",
-    waiting_game: "En attente du jeu",
-    waiting_game_hint: "Lance Genshin et connecte-toi. Déjà en jeu ? Déconnecte-toi (menu Paimon, la porte) puis reconnecte-toi.",
+    waiting_game: "Lance Genshin",
+    waiting_game_hint: "Puis connecte-toi et passe la porte. Déjà en jeu ? Déconnecte-toi (menu Paimon, la porte) puis reconnecte-toi.",
     reading: "Lecture du compte…",
     reading_hint: "Encore un instant.",
-    read_hint: "Teyvin se met à jour : sa page ouverte le fera dans quelques secondes.",
+    open_title: "Ouvre Teyvin",
+    open_hint: "Ton compte est lu. Ouvre Teyvin : il le récupère tout seul, rien à importer.",
+    open_detail: "à ouvrir",
+    updating: "Teyvin se met à jour",
+    read_hint: "Sa page ouverte reçoit ton compte dans quelques secondes. Rien à actualiser.",
     all_done: "Tout est à jour",
     all_done_hint: "Le compte est lu à la connexion : après un farm, reconnecte-toi pour actualiser Teyvin.",
     open_teyvin: "Ouvrir Teyvin",
@@ -112,7 +123,7 @@ const FR: Texts = Texts {
 };
 
 const EN: Texts = Texts {
-    url: "https://teyvin.app/en/account",
+    url: "https://teyvin.app/en/account?compagnon=1",
     download_url: "https://teyvin.app/en/companion",
     brand: "Companion",
     step_ready: "Companion ready",
@@ -120,6 +131,7 @@ const EN: Texts = Texts {
     step_game: "Game connected",
     step_read: "Account read",
     step_teyvin: "Teyvin up to date",
+    step_of: "STEP {n} OF 4",
     starting_detail: "starting…",
     starting: "Starting…",
     checking_updates: "Checking for companion updates.",
@@ -140,11 +152,15 @@ const EN: Texts = Texts {
     capture_stopped: "Capture stopped",
     capture_stopped_hint: "Start the capture again so the companion can read your account.",
     start_capture: "Start capture",
-    waiting_game: "Waiting for the game",
-    waiting_game_hint: "Launch Genshin and log in. Already in game? Log out (Paimon menu, the door), then log back in.",
+    waiting_game: "Launch Genshin",
+    waiting_game_hint: "Then log in and go through the door. Already in game? Log out (Paimon menu, the door), then log back in.",
     reading: "Reading account…",
     reading_hint: "Just a moment.",
-    read_hint: "Teyvin is updating: its open page will do so within seconds.",
+    open_title: "Open Teyvin",
+    open_hint: "Your account is read. Open Teyvin: it picks it up on its own, nothing to import.",
+    open_detail: "to open",
+    updating: "Teyvin is updating",
+    read_hint: "Its open page receives your account within seconds. No need to refresh.",
     all_done: "All up to date",
     all_done_hint: "Your account is read when you log in: after farming, log in again to refresh Teyvin.",
     open_teyvin: "Open Teyvin",
@@ -280,7 +296,7 @@ static AUTO_OPEN: AtomicBool = AtomicBool::new(true);
 /// met à jour toute seule une fois le compte lu. Dans son propre fil : l'écran ne se redessine plus quand la fenêtre
 /// est réduite.
 fn open_teyvin_with_game() {
-    // Une page déjà ouverte se signale au relais toutes les 15 s : on lui laisse le temps de le faire
+    // Une page déjà ouverte se signale au relais toutes les 5 s (plus lentement en arrière-plan) : on lui laisse le temps de le faire
     const SITE_CAN_ANSWER: Duration = Duration::from_secs(20);
     let started = Instant::now();
     thread::spawn(move || {
@@ -397,11 +413,15 @@ enum Step {
 }
 
 struct View {
+    /// « Étape 2 sur 4 », au-dessus du titre, tant que le joueur a quelque chose à faire.
+    eyebrow: Option<String>,
     title: String,
     subtitle: String,
     warn: bool,
-    /// Coche à côté du titre (compte lu, tout est à jour).
+    /// Coche à côté du titre (tout est à jour).
     check: bool,
+    /// « Ouvrir Teyvin » en jaune : seulement quand c'est la chose à faire, compte lu.
+    open_primary: bool,
     steps: [(Step, &'static str, String); 4],
     /// Bouton d'action à la place de « Réduire » (démarrer la capture, mettre à jour…).
     action: Option<(&'static str, Message)>,
@@ -412,10 +432,12 @@ struct View {
 fn view(state: &AppState) -> View {
     let t = tx();
     let wait = |title: &str, subtitle: &str| View {
+        eyebrow: None,
         title: title.to_string(),
         subtitle: subtitle.to_string(),
         warn: false,
         check: false,
+        open_primary: false,
         steps: [
             (Step::Current, t.step_ready, t.starting_detail.into()),
             (Step::Todo, t.step_launch, "—".into()),
@@ -440,61 +462,75 @@ fn view(state: &AppState) -> View {
         },
         State::Main => {
             let u = &state.updated;
-            let game = u.items_updated.or(u.characters_updated);
-            let read = u.items_updated.is_some() && u.characters_updated.is_some();
-            let exported = crate::relay::exported_at();
-            let synced = crate::relay::synced_at();
-            let teyvin = matches!((exported, synced), (Some(e), Some(s)) if s >= e);
-
-            let capture = if state.capturing { Step::Done } else { Step::Current };
-            let mut steps = [
-                (capture, t.step_ready, if state.capturing { t.capture_on.into() } else { t.capture_off.into() }),
-                (Step::Todo, t.step_launch, "—".into()),
-                (Step::Todo, t.step_read, "—".into()),
-                (Step::Todo, t.step_teyvin, t.open_teyvin_detail.into()),
-            ];
-            if state.capturing {
-                steps[1] = match game {
-                    Some(_) => (Step::Done, t.step_game, t.login_read.into()),
-                    None => (Step::Current, t.step_launch, t.waiting.into()),
-                };
-            }
-            if game.is_some() {
-                let detail = if crate::relay::has_wish_url() { t.with_wishes } else { t.chars_inventory };
-                steps[2] = (if read { Step::Done } else { Step::Current }, t.step_read, detail.into());
-            }
-            if read {
-                // Rappel utile plutôt qu'une heure : le compte n'est lu qu'à la connexion au jeu
-                steps[3] = if teyvin {
-                    (Step::Done, t.step_teyvin, t.after_farm.into())
-                } else {
-                    (Step::Current, t.step_teyvin, t.teyvin_soon.into())
-                };
-            }
-
-            let (title, subtitle, warn, action) = if !state.capturing {
-                (t.capture_stopped, t.capture_stopped_hint, true, Some((t.start_capture, Message::StartCapture)))
-            } else if game.is_none() {
-                (t.waiting_game, t.waiting_game_hint, false, None)
-            } else if !read {
-                (t.reading, t.reading_hint, false, None)
-            } else if !teyvin {
-                (t.step_read, t.read_hint, false, None)
-            } else {
-                (t.all_done, t.all_done_hint, false, None)
-            };
-            View {
-                title: title.to_string(),
-                subtitle: subtitle.to_string(),
-                warn,
-                check: read,
-                steps,
-                action,
-                secondary: None,
-                // Jusqu'à ce que Teyvin ait récupéré le compte (il interroge le relais toutes les 15 s)
-                spinner: game.is_some() && !teyvin,
-            }
+            let (exported, synced) = (crate::relay::exported_at(), crate::relay::synced_at());
+            main_view(
+                state.capturing,
+                u.items_updated.or(u.characters_updated).is_some(),
+                u.items_updated.is_some() && u.characters_updated.is_some(),
+                matches!((exported, synced), (Some(e), Some(s)) if s >= e),
+                crate::relay::site_open(),
+            )
         }
+    }
+}
+
+/// L'écran une fois démarré : l'étape à faire est écrite en grand, et le reste s'efface devant elle.
+fn main_view(capturing: bool, game: bool, read: bool, teyvin: bool, site_open: bool) -> View {
+    let t = tx();
+    let capture = if capturing { Step::Done } else { Step::Current };
+    let mut steps = [
+        (capture, t.step_ready, if capturing { t.capture_on.into() } else { t.capture_off.into() }),
+        (Step::Todo, t.step_launch, "—".into()),
+        (Step::Todo, t.step_read, "—".into()),
+        (Step::Todo, t.step_teyvin, "—".into()),
+    ];
+    if capturing {
+        steps[1] = if game {
+            (Step::Done, t.step_game, t.login_read.into())
+        } else {
+            (Step::Current, t.step_launch, t.waiting.into())
+        };
+    }
+    if game {
+        let detail = if crate::relay::has_wish_url() { t.with_wishes } else { t.chars_inventory };
+        steps[2] = (if read { Step::Done } else { Step::Current }, t.step_read, detail.into());
+    }
+    if read {
+        // Rappel utile plutôt qu'une heure : le compte n'est lu qu'à la connexion au jeu
+        steps[3] = if teyvin {
+            (Step::Done, t.step_teyvin, t.after_farm.into())
+        } else if site_open {
+            (Step::Current, t.step_teyvin, t.teyvin_soon.into())
+        } else {
+            (Step::Current, t.step_teyvin, t.open_detail.into())
+        };
+    }
+
+    let (step, title, subtitle, warn, action) = if !capturing {
+        (Some(1), t.capture_stopped, t.capture_stopped_hint, true, Some((t.start_capture, Message::StartCapture)))
+    } else if !game {
+        (Some(2), t.waiting_game, t.waiting_game_hint, false, None)
+    } else if !read {
+        (Some(3), t.reading, t.reading_hint, false, None)
+    } else if teyvin {
+        (None, t.all_done, t.all_done_hint, false, None)
+    } else if site_open {
+        (Some(4), t.updating, t.read_hint, false, None)
+    } else {
+        (Some(4), t.open_title, t.open_hint, false, None)
+    };
+    View {
+        eyebrow: step.map(|n: u8| t.step_of.replace("{n}", &n.to_string())),
+        title: title.to_string(),
+        subtitle: subtitle.to_string(),
+        warn,
+        check: teyvin,
+        open_primary: read,
+        steps,
+        action,
+        secondary: None,
+        // Le compagnon ou la page travaille : le joueur n'a qu'à attendre
+        spinner: (game && !read) || (read && site_open && !teyvin),
     }
 }
 
@@ -565,7 +601,10 @@ impl IrminsulApp {
             FontId::proportional(13.0),
             ORNAMENT,
         );
-        let title = painter.text(pos2(x, top + 52.0), Align2::LEFT_TOP, &v.title, bold(27.0), INK);
+        if let Some(eyebrow) = &v.eyebrow {
+            painter.text(pos2(x, top + 45.0), Align2::LEFT_TOP, eyebrow, bold(12.0), ACCENT);
+        }
+        let title = painter.text(pos2(x, top + 60.0), Align2::LEFT_TOP, &v.title, bold(27.0), INK);
         if v.check {
             painter.text(
                 pos2(title.right() + 10.0, title.center().y),
@@ -621,6 +660,14 @@ impl IrminsulApp {
         painter.rect_stroke(panel, CornerRadius::same(14), Stroke::new(1.0_f32, ORNAMENT.gamma_multiply(0.22)), StrokeKind::Inside);
 
         let center = |i: usize| pos2(panel.left() + 26.0, panel.top() + 6.0 + ROW * (i as f32 + 0.5));
+        // L'étape à faire : une ligne surlignée, le point d'attention de l'écran
+        for (i, (step, ..)) in v.steps.iter().enumerate() {
+            if *step == Step::Current {
+                let row = Rect::from_center_size(pos2(panel.center().x, center(i).y), vec2(COLUMN - 10.0, ROW - 2.0));
+                painter.rect_filled(row, CornerRadius::same(10), ACCENT.gamma_multiply(0.14));
+                painter.rect_stroke(row, CornerRadius::same(10), Stroke::new(1.0_f32, ACCENT.gamma_multiply(0.75)), StrokeKind::Inside);
+            }
+        }
         for i in 0..v.steps.len() - 1 {
             let (from, to) = (center(i), center(i + 1));
             let color = if v.steps[i].0 == Step::Done { OK.gamma_multiply(0.45) } else { ORNAMENT.gamma_multiply(0.22) };
@@ -634,8 +681,8 @@ impl IrminsulApp {
                     painter.text(center, Align2::CENTER_CENTER, egui_material_icons::icons::ICON_CHECK, FontId::proportional(14.0), BG);
                 }
                 Step::Current => {
-                    painter.circle_stroke(center, 9.5, Stroke::new(2.0_f32, ACCENT));
-                    painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), bold(11.5), ACCENT);
+                    painter.circle_filled(center, 11.0, ACCENT);
+                    painter.text(center, Align2::CENTER_CENTER, (i + 1).to_string(), bold(13.0), ON_ACCENT);
                 }
                 Step::Todo => {
                     painter.circle_stroke(center, 9.5, Stroke::new(1.0_f32, MUTED.gamma_multiply(0.6)));
@@ -643,22 +690,26 @@ impl IrminsulApp {
                 }
             }
             let (font, color) = match step {
-                Step::Done => (bold(13.5), INK),
-                Step::Current => (bold(13.5), ACCENT),
-                Step::Todo => (FontId::proportional(13.5), MUTED),
+                Step::Done => (FontId::proportional(13.5), INK.gamma_multiply(0.8)),
+                Step::Current => (bold(15.5), ACCENT),
+                Step::Todo => (FontId::proportional(13.5), MUTED.gamma_multiply(0.8)),
             };
             painter.text(pos2(center.x + 22.0, center.y), Align2::LEFT_CENTER, *label, font, color);
             painter.text(
                 pos2(panel.right() - 14.0, center.y),
                 Align2::RIGHT_CENTER,
                 detail,
-                FontId::proportional(11.5),
-                if *step == Step::Todo { MUTED.gamma_multiply(0.7) } else { MUTED },
+                FontId::proportional(if *step == Step::Current { 12.5 } else { 11.5 }),
+                match step {
+                    Step::Done => MUTED,
+                    Step::Current => INK,
+                    Step::Todo => MUTED.gamma_multiply(0.7),
+                },
             );
         }
     }
 
-    /// Boutons sous les étapes (un seul en jaune : l'action attendue), version et journaux tout en bas.
+    /// Boutons sous les étapes (en jaune seulement si c'est l'action attendue), version et journaux tout en bas.
     fn footer(&mut self, ui: &mut egui::Ui, full: Rect, v: &View) {
         let t = tx();
         let x = full.left() + MARGIN;
@@ -685,7 +736,7 @@ impl IrminsulApp {
         let third = Rect::from_min_max(pos2(second.right() + gap, y), pos2(x + COLUMN, y + h));
 
         let open_label = format!("{}  {}", t.open_teyvin, egui_material_icons::icons::ICON_OPEN_IN_NEW);
-        let open_button = if v.action.is_some() { outline(open_label) } else { primary(open_label) };
+        let open_button = if v.open_primary && v.action.is_none() { primary(open_label) } else { outline(open_label) };
         if ui.put(open, open_button).clicked() {
             crate::relay::open_site(t.url);
         }
@@ -769,5 +820,39 @@ fn clone_message(msg: &Message) -> Message {
         Message::DownloadAcknowledged => Message::DownloadAcknowledged,
         Message::StopCapture => Message::StopCapture,
         _ => Message::StartCapture,
+    }
+}
+
+#[cfg(test)]
+mod teyvin_tests {
+    use super::*;
+
+    fn current(view: &View) -> Vec<usize> {
+        view.steps.iter().enumerate().filter(|(_, s)| s.0 == Step::Current).map(|(i, _)| i + 1).collect()
+    }
+
+    #[test]
+    fn one_step_at_a_time_in_order() {
+        assert_eq!(current(&main_view(false, false, false, false, false)), [1]);
+        assert_eq!(current(&main_view(true, false, false, false, false)), [2]);
+        assert_eq!(current(&main_view(true, true, false, false, false)), [3]);
+        assert_eq!(current(&main_view(true, true, true, false, false)), [4]);
+        assert_eq!(current(&main_view(true, true, true, false, true)), [4]);
+        assert!(current(&main_view(true, true, true, true, true)).is_empty());
+    }
+
+    #[test]
+    fn open_teyvin_stands_out_only_once_the_account_is_read() {
+        assert!(!main_view(true, false, false, false, true).open_primary);
+        assert!(!main_view(true, true, false, false, true).open_primary);
+        assert!(main_view(true, true, true, false, false).open_primary);
+        assert!(main_view(true, true, true, true, true).open_primary);
+    }
+
+    #[test]
+    fn the_step_number_goes_away_once_everything_is_done() {
+        assert!(main_view(true, false, false, false, false).eyebrow.is_some());
+        assert!(main_view(true, true, true, true, true).eyebrow.is_none());
+        assert!(main_view(true, true, true, true, true).check);
     }
 }

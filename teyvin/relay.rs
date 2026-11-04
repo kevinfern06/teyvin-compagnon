@@ -40,7 +40,7 @@ static LATEST: Mutex<Option<Snapshot>> = Mutex::new(None);
 static SYNCED_AT: Mutex<Option<u128>> = Mutex::new(None);
 /// Dernière fois qu'une page de Teyvin a interrogé le relais.
 static SITE_SEEN_AT: Mutex<Option<u128>> = Mutex::new(None);
-/// Une page de Teyvin ouverte passe toutes les 15 s ; le navigateur ralentit un onglet en arrière-plan.
+/// Une page de Teyvin ouverte passe toutes les 5 s ; le navigateur ralentit un onglet en arrière-plan.
 const SITE_OPEN_MS: u128 = 3 * 60_000;
 static WISH: OnceLock<watch::Receiver<Option<String>>> = OnceLock::new();
 
