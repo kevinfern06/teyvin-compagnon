@@ -4,6 +4,7 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
+- New Teyvin cat logo in the window.
 - The “Open Teyvin” button opens the site again, instead of a Documents folder window.
 
 ## Credits
