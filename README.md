@@ -13,9 +13,14 @@ the game is already running when it starts, log out and back in.
 
 ## Features
 
-- Everything Irminsul exports: artifacts, weapons, materials and characters
+- Everything Irminsul exports: artifacts, weapons, materials and characters, plus the wish history
 - Local relay serving the latest export to the Teyvin website
 - Simple window showing the current state of the capture and the relay
+- One-click updates, always confirmed by the user
+
+## Installation
+
+Instructions are on the [Teyvin website](https://teyvin.app/en/companion).
 
 ## Building
 

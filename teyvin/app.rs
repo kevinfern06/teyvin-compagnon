@@ -43,6 +43,8 @@ struct Texts {
     later: &'static str,
     update_available: &'static str,
     update_ready: &'static str,
+    installing: &'static str,
+    installing_hint: &'static str,
     capture_on: &'static str,
     capture_off: &'static str,
     waiting: &'static str,
@@ -88,10 +90,12 @@ const FR: Texts = Texts {
     starting: "Démarrage…",
     checking_updates: "Vérification des mises à jour du compagnon.",
     loading_data: "Chargement des données du jeu.",
-    update: "Télécharger",
+    update: "Mettre à jour",
     later: "Plus tard",
     update_available: "Mise à jour disponible",
-    update_ready: "La version {v} du compagnon est sortie. Le bouton ouvre sa page de téléchargement.",
+    update_ready: "La version {v} du compagnon est sortie. Un clic suffit : il se relance tout seul.",
+    installing: "Mise à jour en cours",
+    installing_hint: "Le compagnon télécharge sa nouvelle version, puis se relance.",
     capture_on: "capture active",
     capture_off: "capture arrêtée",
     waiting: "en attente…",
@@ -136,10 +140,12 @@ const EN: Texts = Texts {
     starting: "Starting…",
     checking_updates: "Checking for companion updates.",
     loading_data: "Loading game data.",
-    update: "Download",
+    update: "Update",
     later: "Later",
     update_available: "Update available",
-    update_ready: "Companion version {v} is out. The button opens its download page.",
+    update_ready: "Companion version {v} is out. One click is enough: it restarts on its own.",
+    installing: "Updating",
+    installing_hint: "The companion is downloading its new version, then it will restart.",
     capture_on: "capture on",
     capture_off: "capture stopped",
     waiting: "waiting…",
@@ -429,6 +435,11 @@ struct View {
     spinner: bool,
 }
 
+/// Page de téléchargement, si la mise à jour en un clic échoue.
+pub fn download_page() -> &'static str {
+    tx().download_url
+}
+
 fn view(state: &AppState) -> View {
     let t = tx();
     let wait = |title: &str, subtitle: &str| View {
@@ -454,6 +465,7 @@ fn view(state: &AppState) -> View {
             wait(t.starting, t.checking_updates)
         }
         State::WaitingForDownloadConfirmation(_) => wait(t.starting, t.loading_data),
+        State::Updating => wait(t.installing, t.installing_hint),
         State::WaitingForUpdateConfirmation(version) => View {
             spinner: false,
             action: Some((t.update, Message::UpdateAcknowledged)),
@@ -746,9 +758,6 @@ impl IrminsulApp {
             (Some((label, msg)), secondary) => {
                 let msg = clone_message(msg);
                 if ui.put(second, primary((*label).to_string())).clicked() {
-                    if matches!(msg, Message::UpdateAcknowledged) {
-                        crate::relay::open_site(t.download_url);
-                    }
                     self.send(msg);
                 }
                 if let Some((label, msg)) = secondary {

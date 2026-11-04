@@ -4,8 +4,8 @@ Instructions are on [teyvin.app](https://teyvin.app/en/companion).
 
 ## Changes
 
-- Clearer window: the step to do now stands out, and "Open Teyvin" is highlighted once your account has been read.
-- Teyvin now connects to the companion on its own when the companion opens it.
+- One-click updates: when a new version is out, the "Update" button downloads it, checks it and restarts the
+  companion. Nothing happens without that click, and the download page opens if the update fails.
 
 ## Credits
 

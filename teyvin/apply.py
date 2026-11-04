@@ -92,13 +92,13 @@ def main() -> None:
         + anchor,
     )
 
-    # 3. Mises à jour : le compagnon signale une nouvelle version sans jamais se remplacer lui-même (un .exe qui se
-    # télécharge, se renomme et se supprime ressemble à un virus pour les antivirus)
+    # 3. Mises à jour : un clic du joueur, téléchargement vérifié, le nouveau fichier prend la place de l'ancien
     shutil.copy(HERE / "update.rs", src / "update.rs")
     edit(src / "update.rs", "__REPO__", args.repo)
-    print("  remplacé : update.rs (signale seulement)")
-    # self_update embarque son code d'auto-remplacement dès qu'elle est liée, même sans être appelée
-    edit(args.irminsul / "Cargo.toml", 'self_update = "0.42.0"\n', f'semver = "1.0" {MARK.replace("//", "#")}\n')
+    print("  remplacé : update.rs (en un clic)")
+    # self_update embarque du code d'auto-suppression dès qu'elle est liée, même sans être appelée
+    tag = MARK.replace("//", "#")
+    edit(args.irminsul / "Cargo.toml", 'self_update = "0.42.0"\n', f'semver = "1.0" {tag}\nsha2 = "0.10" {tag}\n')
     edit(
         src / "main.rs",
         """    Updating,
@@ -108,7 +108,7 @@ def main() -> None:
         needs_caps: bool,
     },
 """,
-        f"    {MARK} : plus d'état « mise à jour en cours », voir teyvin/update.rs\n",
+        f"    Updating, {MARK} : voir teyvin/update.rs\n",
     )
 
     # 3 ter. Nom « Teyvin Companion » : titre de la fenêtre (barre des tâches) et détails du .exe (gestionnaire des
